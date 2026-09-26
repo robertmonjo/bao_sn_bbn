@@ -162,6 +162,49 @@ def _e_sat_on_grid(n, z_eval, ah=ALPHA_HIGH):
     h   = 1./dr
     return h / h[0]   # h[0] = 1 by geometry (drhat/dz|_{z=0} = 1 for any alpha)
 
+def _e_const_on_grid(alpha, z_eval):
+    """E(z)/E(0) for constant alpha, using the full model geometry at that alpha.
+
+    Analogous to _e_sat_on_grid but uses ExtendedProjectedHyperconical(alpha=alpha)
+    (not ALPHA_LOW) for the geometry, and applies a constant exponent az=alpha.
+    Numerically stable up to z~10^6; use bbn_geomean_const for z >> 10^6.
+    """
+    z = np.asarray(z_eval, float)
+    model = ExtendedProjectedHyperconical(alpha=alpha)
+    x   = model.x_from_lz(np.log1p(z))
+    u   = np.sqrt(np.maximum(1./model.k - x**2, 1e-14))
+    y   = np.arctan2(x, u)
+    g   = np.maximum(1. - y/model.y0, 1e-12)
+    t   = (y/2.) / (g**alpha)
+    rhat = 2.*np.arctan(t)
+    dr  = np.gradient(rhat, z, edge_order=2)
+    dr  = np.where(np.abs(dr) < 1e-18, np.sign(dr)*1e-18 + (dr == 0.)*1e-18, dr)
+    h   = 1./dr
+    return h / h[0]
+
+def E_hippopede_const(alpha, n=3000):
+    """E(z) grid for constant-alpha hyperconical model."""
+    zf = np.linspace(0., Z_MAX*1.01, n)
+    return zf, _e_const_on_grid(alpha, zf)
+
+def bbn_geomean_const(alpha, n_T=80, z_ref=1e6):
+    """BBN geometric mean for constant alpha using the full model geometry at alpha.
+
+    E_ref at z_ref is obtained from _e_const_on_grid; extrapolated analytically
+    via E_BBN = E_ref * ((1+z_BBN)/(1+z_ref))^{1+2*alpha}, valid when g->0 (high-z).
+    """
+    z_eval = np.unique(np.concatenate([
+        np.linspace(0., 1., 400),
+        np.geomspace(1., z_ref * 1.02, 5000),
+    ]))
+    E_ref = float(np.interp(z_ref, z_eval, _e_const_on_grid(alpha, z_eval)))
+    T_arr = np.geomspace(_T_BBN_LO, _T_BBN_HI, n_T)
+    z_arr = T_arr * 1.e6 / _T0_EV - 1.
+    ln_r  = np.log((1. + z_arr) / (1. + z_ref))
+    E_BBN = E_ref * np.exp((1. + 2.*alpha) * ln_r)
+    ratio = _H0_SI * E_BBN / _H_std(T_arr)
+    return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
+
 def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
     """Geometric mean of H_perc(T)/H_std(T) over T=0.07-0.10 MeV.
 
@@ -248,8 +291,10 @@ def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1):
           f"{bbn_norm:>10}  {db:>+8.2f} {ds:>+8.2f} {dj:>+8.2f}")
 
 print(f"\n{'Constraint':<14} {'Model':<22} {'Param':<12} {'χ²ν_BAO':>8} {'χ²ν_SN':>8} "
-      f"{'BBN_norm':>10}  {'ΔAIC_BAO':>8} {'ΔAIC_SN':>8} {'ΔAIC_tot':>8}")
-print(f"  1-par ΛCDM ref: Ω_m={res_jnt.x:.4f} (joint BAO+SN)  |  2-par ΛCDM ref: same Ω_m, k=2 (BBN trivially satisfied)")
+      f"{'BBN_norm':>10}  {'Δχ²_BAO':>8} {'Δχ²_SN':>8} {'ΔAIC_tot':>8}")
+print(f"  Note: ΔAIC_tot = Δχ²_BAO + Δχ²_SN + 2(k_model − k_ΛCDM)  "
+      f"[standard rows k_model=k_ΛCDM=1 → Δk=0; BBN/0-par rows: Δk=−1]")
+print(f"  1-par ΛCDM ref: Ω_m={res_jnt.x:.4f} (joint BAO+SN)  |  2-par ΛCDM ref: same Ω_m, k=2")
 print("-"*110)
 
 zf, Ef = E_hippopede(sat(n_bao_opt))
@@ -270,6 +315,19 @@ row4("BAO+SN",     "ΛCDM (1-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcd
 # 2-par LCDM reference: k_model=k_lcdm=2 so DAIC=0 (self-reference for BBN group)
 # Omega_r is calibrated by BBN (not fitted to BAO/SN); chi2 values same as 1-par (Omega_r negligible at DESI z)
 row4("BAO+SN+BBN", "ΛCDM (2-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcdm, "1", k_model=2, k_lcdm=2)
+print("-"*110)
+print("  Hyperconical constant-α (no running) — baseline; contrasts with running extension below")
+res_alpha_const = minimize_scalar(
+    lambda a: chi2_joint(*E_hippopede_const(a)), bounds=(0.20, 0.50), method="bounded")
+alpha_const_opt = res_alpha_const.x
+gm_const_opt  = bbn_geomean_const(alpha_const_opt)
+gm_const_half = bbn_geomean_const(0.500)
+print(f"  Const-α BAO+SN-optimal: α={alpha_const_opt:.4f}, gm={gm_const_opt:.2f}")
+print(f"  Const-α α=1/2 (BBN-preferred limit): gm={gm_const_half:.4f}")
+zfc_opt,  Efc_opt  = E_hippopede_const(alpha_const_opt)
+zfc_half, Efc_half = E_hippopede_const(0.500)
+row4("BAO+SN", "Hyp const-α",   f"α={alpha_const_opt:.3f}", zfc_opt,  Efc_opt,  f"~{gm_const_opt:.1f}",  k_lcdm=1)
+row4("BAO+SN", "Hyp const-α",   "α=1/2 (fix)",              zfc_half, Efc_half, f"~{gm_const_half:.1f}", k_lcdm=1)
 print("-"*110)
 print("  SAT-2 (n=1/2 fix, alpha_h free) — exploratory parametrisation for alpha+gamma_U running")
 # 0-par: n=0.5 AND alpha_high=0.5 both fixed (theoretical prediction, k=0 vs LCDM k=1)

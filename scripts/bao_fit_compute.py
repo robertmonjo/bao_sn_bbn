@@ -27,7 +27,7 @@ for extra in (str(SCRIPT_ROOT), str(SCRIPT_ROOT / "obsolete_bbn")):
     if extra not in sys.path:
         sys.path.insert(0, extra)
 
-from analyze_hippopede_dipole_bbn import ExtendedProjectedHyperconical  # noqa: E402
+from hyperconical_model import ExtendedProjectedHyperconical  # noqa: E402
 
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 
