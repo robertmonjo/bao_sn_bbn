@@ -1,14 +1,169 @@
-\documentclass{article}
-\usepackage{graphicx} % Required for inserting images
+\documentclass[3p,twocolumn]{elsarticle}
 
-\title{hyperconical_BBN}
-\author{Robert Monjo}
-\date{September 2026}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[normalem]{ulem}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\graphicspath{{figures/}}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+\renewcommand{\vec}[1]{\boldsymbol{#1}}
+
+\journal{Physics Letters B}
 
 \begin{document}
 
-\maketitle
+\begin{frontmatter}
+
+\title{Coasting cosmologies compatible with BAO and nucleosynthesis}
+
+\author[cunef,chile]{Robert Monjo}
+\author[barcelona]{Manel Romero}
+\author[mgU]{Ardra E. Sasi}
+
+\address[cunef]{Department of Mathematics, CUNEF Universidad, Calle Almansa 101, Madrid 28040, Spain}
+\address[chile]{Centro de Estudios Cosmologicos ``Prof. Jaime Roessler Bonzi'', Facultad de Ciencias, Universidad de Chile, Las Palmeras 3425, \~Nunoa, Santiago 7750000, Chile}
+\address[barcelona]{Area of Chemistry, University of Barcelona, Campus Diagonal: Av. Joan XXIII, 27-31, 08028 Barcelona, Spain}
+\address[mgU]{School of Pure and Applied Physics, Mahatma Gandhi University, Priyadarsini Hills P.O. Athirampuzha, Kottayam, Kerala 686560, India}
+
+\begin{abstract}
+The hyperconical universe, defined by the null quadratic locus $-t^2+\|\vec\rho\|^2=0$ in a five-dimensional Minkowski space, provides an exact coasting expansion $a(t)\propto t$ on each constant-time slice. A Monjo-type stereographic projection with a single shape parameter $\alpha$ fits the DESI DR1 compressed BAO data ($z=0.295$--$1.491$; $\Delta\mathrm{AIC}=0.68$ relative to flat $\Lambda$CDM). A running-$\alpha$ extension that interpolates from the late-time value $\alpha_{\rm low}\approx0.283$ to the radiation-era asymptote $\alpha_{\rm high}=1/2$ recovers the standard nucleosynthesis Hubble normalisation to within $3\times10^{-4}$ at $T\simeq0.07$--$0.10\,\mathrm{MeV}$, establishing coasting cosmologies as a viable framework for joint BAO--BBN analyses.
+\end{abstract}
+
+\begin{keyword}
+coasting universe \sep hyperconical model \sep Monjo projection \sep BAO \sep nucleosynthesis
+\end{keyword}
+
+\end{frontmatter}
 
 \section{Introduction}
+
+The persistent tension between early- and late-time measurements of the Hubble constant \cite{verde2019tensions}, reinforced by baryon acoustic oscillation (BAO) data \cite{adame2025desi}, motivates geometrically grounded alternatives to $\Lambda$CDM in which apparent acceleration arises from a projection map rather than from a cosmological constant. In hyperconical approaches, an apparently accelerated phenomenology arises from the projection map, even when the underlying ambient-space expansion remains asymptotically linear \cite{monjo2018projected, monjo2023hubble}.
+
+Coasting cosmologies, for which the late-time scale factor ($a$) behaves as $a(t)\propto t$, were first studied by John et al. \cite{john2000coasting, John2019}, and more recently they have reappeared in hyperconical modified-gravity constructions where the linear law is tied to an ambient-space geometric constraint \cite{monjo2017hyperconical, Monjo_2024, Monjo_2025}. Recent hyperconical constructions show good agreement with cluster and lensing data \cite{monjo2025clusters, monjo2025lensing}.
+
+The main cosmological motivation for relaxing exact coasting at all epochs comes from primordial nucleosynthesis. Under strictly linear expansion, with $H(t)=1/t$, neutron freeze-out occurs under non-standard conditions, leading to helium overproduction unless additional assumptions are introduced \cite{sethi1999coasting,dev2002coasting}. Here we constrain the projected hyperconical model against the DESI DR1 BAO data and test a running-$\alpha$ extension against the primordial nucleosynthesis window.
+
+Like de Sitter and anti-de Sitter spacetimes, the hyperconical universe $\mathcal{H}^4:=\{(t,\vec\rho)\in\mathbb{R}^{4,1}: -t^2+\|\vec\rho\|^2=0\}$ is a null quadratic locus in pseudo-Euclidean ambient space \cite{hawking1973large, monjo2017hyperconical}, yielding linear expansion on each constant-$t$ slice and providing a geometric interpretation for the coasting law.
+
+In the following, we describe the hyperconical model and the Monjo-type stereographic projection (Section~\ref{sec:methods}), constrain $\alpha$ against DESI DR1 BAO data, and test a running-$\alpha$ extension against the BBN window (Section~\ref{sec:results}). Discussion follows in Section~\ref{sec:discussion}.
+
+\section{Data and methods}\label{sec:methods}
+
+\subsection{Datasets}
+
+The primary observational input is the DESI DR1 compressed BAO catalogue \cite{adame2025desi}, which provides measurements of three distance combinations in six tracer bins at effective redshifts $z_{\rm eff}=0.295$, $0.510$, $0.706$, $0.930$, $1.317$, and $1.491$. Each bin reports: (i) the comoving angular diameter distance ratio $D_M/r_s$, where $D_M(z)=(1+z)D_A(z)$ is the comoving transverse distance; (ii) the Hubble distance ratio $D_H/r_s \equiv c/[H(z)\,r_s]$; and (iii) the volume-averaged distance ratio $D_V/r_s \equiv [z\,D_M^2(z)\,D_H(z)]^{1/3}/r_s$. Here $r_s$ is the comoving sound horizon at the drag epoch; within the projected hyperconical likelihood it enters only as the combined nuisance $\beta=c/(H_0 r_s)$, analytically marginalized at each $\alpha$. The Ly$\alpha$ forest point near $z_{\rm eff}\simeq2.33$ is excluded, keeping the fit within the tracer-galaxy window.
+
+\subsection{Model}
+
+\subsubsection{The hyperconical universe}
+
+The hyperconical universe is the null locus
+\begin{equation}
+\label{eq:hyperconical}
+\mathcal{H}^4:=\bigl\{(t,\vec\rho)\in\mathbb{R}^{1,4}:\,-t^2+\|\vec\rho\|^2=0\bigr\},
+\end{equation}
+giving a scale factor $a(t)=t$ and coasting expansion $E(z)=1+z$ on each constant-$t$ slice. The intrinsic geometric coordinate $x$ on the cone is related to the observed redshift through the metric-determined map $\log(1+z)\mapsto x$ \cite{monjo2017hyperconical}, independently of the projection parameter $\alpha$.
+
+\subsubsection{Projected prescription}\label{sec:proj}
+
+A Monjo-type stereographic remapping \cite{monjo2018projected} applied to the hyperconical model gives the projected comoving distance
+\begin{equation}
+\hat r :=
+2\arctan\!\left[
+\frac{\gamma(r)/2}{\left(1-\gamma(r)/\gamma_U\right)^\alpha}
+\right],
+\end{equation}
+where $\gamma(r):=\arcsin(r)$, $\gamma_U=\pi/3$ for the $k=1$ hyperconical domain, and $\alpha$ is the single shape parameter. The projected Hubble rate is \cite{monjo2017hyperconical}:
+\begin{equation}
+\hat H(z):=\left(\frac{d\hat r}{dz}\right)^{-1},
+\qquad
+E_{\mathrm{hyp}}^{\mathrm{proj}}(z)=\frac{\hat H(z)}{\hat H(0)}.
+\end{equation}
+In the high-$z$ limit,
+\begin{equation}
+E_{\mathrm{hyp}}^{\mathrm{proj}}(z)\propto (1+z)^{1+2\alpha}\quad(z\gg1),
+\end{equation}
+so $\alpha=1/2$ yields the radiation-like law $H_{\mathrm{perc}}(T)\propto T^2$ required at the BBN epoch \cite{monjo2023hubble, monjo2020lagrangian}.
+
+%\begin{equation}
+%\label{eq:running_pade}
+%\alpha(z)=\alpha_{\mathrm{low}}+(\alpha_{\mathrm{high}}-\alpha_{\mathrm{low}})\,\frac{z}{z+z_c},
+%\end{equation}
+A power-law form,
+\begin{equation}
+\label{eq:running_power}
+\alpha(z)=\alpha_{\mathrm{high}}-(\alpha_{\mathrm{high}}-\alpha_{\mathrm{low}})\,(1+z)^{-n},
+\end{equation}
+interpolates between these limits, recovering $\alpha(0)=\alpha_{\mathrm{low}}$ exactly and $\alpha\to\alpha_{\mathrm{high}}$ for $z\to\infty$, with $n$ as the single free parameter. Here $\alpha_{\rm low}\simeq0.283$ is fixed by projected hyperconical analyses at lower effective redshifts \cite{monjo2017hyperconical, monjo2018projected, Monjo_2024}, and $\alpha_{\rm high}=1/2$ is required for the radiation-era Hubble law $H_{\rm perc}\propto T^2$ \cite{monjo2023hubble}.
+
+\subsection{Likelihood analysis}
+
+Statistical analyses keep $\alpha$ as the single geometric parameter. The fit quality is measured by $\chi^2=(\mathbf{D}^{\rm obs}-\mathbf{D}^{\rm model})^T C^{-1}(\mathbf{D}^{\rm obs}-\mathbf{D}^{\rm model})$, where $\mathbf{D}$ is the vector of measured distance ratios $\{D_M/r_s, D_H/r_s, D_V/r_s\}$ and $C$ is the DESI DR1 full covariance matrix across all BAO distance combinations. Nuisance parameters are eliminated analytically: for BAO the nuisance $\beta=c/(H_0 r_s)$ is minimized at each $\alpha$. A complementary supernova test uses the 50-bin Pantheon$+$ distance proxy \cite{Brout_2022}, with a single amplitude $A$ marginalized analytically; the joint figure of merit is $\chi^2_{\rm joint}=\chi^2_{\rm BAO}+\chi^2_{\rm SN}$, with $\nu_{\rm BAO}=9$ and $\nu_{\rm SN}=49$ degrees of freedom. For model comparison, flat $\Lambda$CDM with free $\Omega_m$ and the same nuisance marginalizations is fitted to the same data, with the Akaike Information Criterion (AIC; \cite{burnham2002model}) adopting $|\Delta\mathrm{AIC}|<2$ as the threshold for indistinguishable model performance.
+
+\section{Results}\label{sec:results}
+
+Applying the projected model to the DESI DR1 compressed BAO data gives $\alpha_{\mathrm{eff}} = 0.375_{-0.016}^{+0.017}$ ($1\sigma$) with $\beta=28.85$, $\chi^2=12.33$, for 10 data points and 1 free parameter ($\beta$ analytically marginalized). Flat $\Lambda$CDM gives $\Omega_m=0.290$, $\chi^2=11.66$, $\Delta\mathrm{AIC}=0.68$: the two models are statistically indistinguishable.
+
+The BAO-derived $\alpha_{\rm BAO}=0.375$ is higher than the values $\alpha\approx0.283$--$0.323$ found in projected hyperconical analyses at lower effective redshifts \cite{monjo2017hyperconical, monjo2018projected, Monjo_2024}, consistent with a running projection index that increases from late times toward the BBN epoch.
+
+\begin{figure*}[htbp]
+\centering
+\includegraphics[width=\textwidth]{bao_fit_data}
+\caption{Running-$\alpha$ model (solid, Eq.~\ref{eq:running_power}) versus flat $\Lambda$CDM (dashed) at the joint BAO+SN optimal parameters ($n=0.296$, $\Omega_m=0.339$; sound horizon $r_s$ and SN amplitude analytically marginalized). \emph{Top:} DESI DR1 BAO observables $D_M/r_s$, $D_H/r_s$, $D_V/r_s$ (error bars: diagonal of the covariance matrix). \emph{Bottom:} Pantheon$+$ 50-bin distance proxy.}
+\label{fig:bao_fit}
+\end{figure*}
+
+Direct $\chi^2$ minimisation gives $n\approx0.355$ ($\Delta\mathrm{AIC}=+0.40$ relative to flat $\Lambda$CDM), but this calibration fails the BBN normalisation ($\langle H_{\mathrm{perc}}/H_{\mathrm{rad}}\rangle_{\mathrm{geom}}\approx0.14$). The joint BAO+BBN solution $n\approx0.468$ recovers $\langle H_{\mathrm{perc}}/H_{\mathrm{rad}}\rangle_{\mathrm{geom}}=1.000$ over $T=0.07$--$0.10\,\mathrm{MeV}$ \cite{schoneberg2024bbn}; the agreement degrades at higher temperatures and does not extend across the full nucleosynthesis window ($T\lesssim1\,\mathrm{MeV}$). This solution gives $\Delta\mathrm{AIC}=+2.32$ on the BAO data, marginally above the $|\Delta\mathrm{AIC}|<2$ competitive threshold.
+
+Table~\ref{tab:joint} places these constraints in a joint BAO+SN context. Non-BBN rows use a 1-par $\Lambda$CDM reference ($\Omega_m=0.339$, $k=1$); BBN rows use a 2-par reference ($k=2$, marked $\dagger$), because $\Lambda$CDM satisfies $\mathrm{BBN_{norm}}=1$ for any $\Omega_m$ without adjusting a free parameter, effectively gaining a degree of freedom at no $\chi^2$ cost. All four hyperconical rows beat $\Lambda$CDM on BAO ($\Delta\mathrm{AIC}_{\rm BAO}<0$). Enforcing BBN shifts the free parameter from $n=0.296$ (joint-optimal, $\Delta\mathrm{AIC}_{\rm tot}=-2.19$) to $n=0.468$, at a cost of $+6.10$ in $\Delta\mathrm{AIC}_{\rm SN}$ and a total $\Delta\mathrm{AIC}_{\rm tot}=+2.01$ against the 2-par $\Lambda$CDM reference. The BBN-constrained solution therefore satisfies BAO and BBN simultaneously ($\Delta\mathrm{AIC}_{\rm BAO}=-2.09$; $\mathrm{BBN_{norm}}=1.002$); the unresolved tension is with SNe~Ia alone.
+
+\begin{table*}[htbp]
+\centering
+\small
+\caption{Fit statistics for the hyperconical running-$\alpha$ model versus flat $\Lambda$CDM. }
+\label{tab:joint}
+\begin{tabular}{ll>{\raggedright\arraybackslash}p{2.9cm}cccrrr}
+\hline\hline
+\multirow{2}{*}{Constraint} & \multirow{2}{*}{Model} & \multirow{2}{*}{Parameters} & {$H_\mathrm{norm}$} & \multicolumn{2}{c}{$\chi^2_\nu$} & \multicolumn{3}{c}{$\Delta\mathrm{AIC}$} \\
+\cmidrule(lr){4-4}\cmidrule(lr){5-6}\cmidrule(lr){7-9}
+ & & & BBN & BAO & SN & BAO & SN & tot \\
+\hline
+\multirow{2}{*}{BAO+SN}     & Hyp.\ $\alpha$-run & $n=0.30^{+0.07}_{-0.06}$ & ${<}0.14$ & 1.409 & 0.811 & $-3.42$ & $+1.23$ & $-2.19$ \\
+                             & $\Lambda$CDM (ref) & $\Omega_m=0.339\pm0.016$ & $1$ & 1.789 & 0.786 & $0$ & $0$ & $0$ \\
+\hline
+\multirow{2}{*}{BAO+SN+BBN} & Hyp.\ $\alpha$-run & $n=0.468$ & $1.002$ & 1.557 & 0.911 & $-2.09$ & $+6.10$ & $+2.01$ \\
+                             & $\Lambda$CDM (ref) & $\Omega_m=0.339\pm0.016$\newline$\Omega_r h^2=4.18\times10^{-5}$ & $1$ & 1.789 & 0.786 & $0$ & $0$ & $0$ \\
+\hline\hline
+\end{tabular}
+\par\vspace{2pt}
+{\footnotesize $H_\mathrm{norm}=\langle H_{\rm perc}/H_{\rm rad}\rangle_{\rm geom}$ at $T=0.07$--$0.10\,\mathrm{MeV}$. Non-BBN rows use a 1-par $\Lambda$CDM reference ($\Omega_m$ free, $k=1$, $\Delta\mathrm{AIC}=0$); BBN rows use a 2-par reference ($k=2$, adding $\Omega_r h^2=4.18\times10^{-5}$ from CMB, $\Delta\mathrm{AIC}=0$); for BBN rows $\Delta\mathrm{AIC}_{\rm tot}=\Delta\chi^2_{\rm tot}-2$. Uncertainties are $1\sigma$; $n=0.468$ is fixed by BBN calibration.}
+\end{table*}
+
+\section{Discussion and conclusions}\label{sec:discussion}
+
+The projected hyperconical model provides a geometrically motivated framework for coasting cosmologies, with a single running parameter $n$ bridging the late-time BAO regime and the primordial nucleosynthesis epoch. Within this class, a single shape parameter $\alpha$ fits the DESI DR1 BAO data ($\alpha_{\mathrm{BAO}}=0.375$, $\Delta\mathrm{AIC}=0.68$), and a running-$\alpha$ extension is not ruled out by the BBN Hubble-rate normalisation at $T\simeq0.07$--$0.10\,\mathrm{MeV}$. This running interpretation implies that the projection index tracks the effective number of relativistic degrees of freedom, bridging a late-time geometric regime ($\alpha\approx0.283$--$0.323$) with the radiation-era asymptote ($\alpha=1/2$) required by the BBN normalisation. The present results also require a Bayesian marginalisation over angular and projection degrees of freedom, a consistent treatment of the weak-interaction freeze-out, and a sound-horizon calibration against cosmic microwave background (CMB) data. Table~\ref{tab:joint} shows that the power-law running-$\alpha$ model at $n=0.468$ achieves simultaneous compatibility with both BAO ($\Delta\mathrm{AIC}_{\rm BAO}=-2.09$) and the BBN normalisation ($\mathrm{BBN_{norm}}=1.002$), with $\Delta\mathrm{AIC}_{\rm tot}=+2.01$ against the 2-par $\Lambda$CDM reference, establishing coasting cosmologies as a viable framework for joint BAO--BBN analyses. This result is placed in context by the internal $\Lambda$CDM BAO--SN tension ($\Omega_m^{\rm BAO}=0.289$ vs $\Omega_m^{\rm SN}=0.371$): unlike $\Lambda$CDM, the hyperconical model accommodates BAO and SNe~Ia jointly ($n=0.296$, $\Delta\mathrm{AIC}_{\rm tot}=-2.19$), with the SN tension emerging only when the BBN normalisation is additionally enforced. Resolving the latter will require an extension in which both $\alpha$ and the projection angle $\gamma_U$ run with redshift, which is the subject of ongoing work.
+
+\section*{Acknowledgements}
+R. Monjo thanks Moncy V. John for his encouragement and support at the start of the collaboration with A. E. Sasi.
+
+\section*{Data availability}
+
+The Python scripts used to generate all figures and supplementary diagnostics are publicly available at \url{https://github.com/robertmonjo/hippopede}, together with the required data files.
+
+\section*{CRediT authorship contribution statement}
+\textbf{Robert Monjo:} Conceptualization, Methodology, Software, Formal analysis, Writing -- original draft, Writing -- review \& editing, Supervision. \textbf{Manel Romero:} Conceptualization, Writing -- review \& editing. \textbf{Ardra E. Sasi:} Software, Writing -- review \& editing.
+
+\section*{Declaration of competing interests}
+The authors declare no competing interests.
+
+\section*{Declaration of generative AI}
+During the preparation of this work the authors used AI-assisted language tools to improve the readability of the manuscript. The authors reviewed and edited the content and take full responsibility for the publication.
+
+\bibliographystyle{elsarticle-num}
+\bibliography{main-bbn-hyperconical}
 
 \end{document}
