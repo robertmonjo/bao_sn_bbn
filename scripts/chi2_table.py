@@ -16,6 +16,7 @@ from hyperconical_model import ExtendedProjectedHyperconical
 
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
+N_SAT_FIX = 0.5   # exploratory fixed exponent for SAT-2 parametrisation
 
 # ── BBN physical constants ─────────────────────────────────────────────────────
 _T0_EV      = 2.7255 * 8.617333262e-5         # CMB temperature in eV
@@ -138,10 +139,10 @@ print(f"ΛCDM joint: Ω_m={res_jnt.x:.4f}, χ²_joint={c2j_lcdm:.4f}")
 
 # ── ansatz functions ──────────────────────────────────────────────────────────
 
-def sat(n):   return lambda z: ALPHA_HIGH - (ALPHA_HIGH-ALPHA_LOW)*(1+z)**(-n)
+def sat(n, ah=ALPHA_HIGH):   return lambda z: ah - (ah-ALPHA_LOW)*(1+z)**(-n)
 def pade(al,zc): return lambda z: al + (ALPHA_HIGH-al)*z/(z+zc)
 
-def _e_sat_on_grid(n, z_eval):
+def _e_sat_on_grid(n, z_eval, ah=ALPHA_HIGH):
     """E(z)/E(0) for SAT running-alpha on a provided z_eval grid (must start at 0).
 
     Numerically stable only for z_eval well below z_BBN~3e8; beyond ~1e7 the
@@ -152,7 +153,7 @@ def _e_sat_on_grid(n, z_eval):
     x   = model.x_from_lz(np.log1p(z))
     u   = np.sqrt(np.maximum(1./model.k - x**2, 1e-14))
     y   = np.arctan2(x, u)
-    az  = sat(n)(z)
+    az  = sat(n, ah)(z)
     g   = np.maximum(1. - y/model.y0, 1e-12)
     t   = (y/2.) / (g**az)
     rhat = 2.*np.arctan(t)
@@ -161,7 +162,7 @@ def _e_sat_on_grid(n, z_eval):
     h   = 1./dr
     return h / h[0]   # h[0] = 1 by geometry (drhat/dz|_{z=0} = 1 for any alpha)
 
-def bbn_geomean(n, n_T=80, z_ref=1e6):
+def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
     """Geometric mean of H_perc(T)/H_std(T) over T=0.07-0.10 MeV.
 
     Analytical extrapolation: integrates nu(z) = 1 + 2*alpha(z) from z_ref to
@@ -178,14 +179,14 @@ def bbn_geomean(n, n_T=80, z_ref=1e6):
         np.linspace(0., 1., 400),
         np.geomspace(1., z_ref * 1.02, 5000),
     ]))
-    e_run = _e_sat_on_grid(n, z_eval)
+    e_run = _e_sat_on_grid(n, z_eval, ah)
     E_ref = float(np.interp(z_ref, z_eval, e_run))
 
     # Extrapolate to BBN temperatures (z~3e8)
     T_arr = np.geomspace(_T_BBN_LO, _T_BBN_HI, n_T)
     z_arr = T_arr * 1.e6 / _T0_EV - 1.
     ln_r = np.log((1. + z_arr) / (1. + z_ref))
-    integral_alpha = ALPHA_HIGH * ln_r + (ALPHA_HIGH - ALPHA_LOW) / n * (
+    integral_alpha = ah * ln_r + (ah - ALPHA_LOW) / n * (
         (1. + z_arr)**(-n) - (1. + z_ref)**(-n))
     E_BBN = E_ref * np.exp(ln_r + 2. * integral_alpha)
     ratio  = _H0_SI * E_BBN / _H_std(T_arr)
@@ -212,7 +213,28 @@ n_bbn_opt    = brentq(lambda n: np.log(bbn_geomean(n)), 0.04, 0.12, xtol=1e-4)
 gm_bbn_opt   = bbn_geomean(n_bbn_opt)
 print(f"  n_bbn_opt={n_bbn_opt:.4f} (gm={gm_bbn_opt:.4f})")
 
+# ── SAT-2: n=0.5 fixed, alpha_high free ──────────────────────────────────────
+# Exploratory parametrisation: SAT exponent n=1/2 interpolates alpha(z) as
+# alpha(z) = ah - (ah-al)/sqrt(1+z).  Motivation: empirical fit to BAO+SN+BBN;
+# connection to gamma_U-running under investigation.
+
+res_ah_bao = minimize_scalar(
+    lambda ah: chi2_joint(*E_hippopede(sat(N_SAT_FIX, ah))),
+    bounds=(0.30, 0.65), method="bounded")
+ah_bao_opt = res_ah_bao.x
+gm_ah_bao  = bbn_geomean(N_SAT_FIX, ah_bao_opt)
+print(f"\nSAT-2 (n=0.5 fix) BAO+SN-optimal: ah={ah_bao_opt:.4f}, gm={gm_ah_bao:.3f}")
+
+# BBN-constrained alpha_high for n=0.5 (gm=1)
+ah_bbn_lo, ah_bbn_hi = 0.30, 0.55
+gm_lo = bbn_geomean(N_SAT_FIX, ah_bbn_lo); gm_hi = bbn_geomean(N_SAT_FIX, ah_bbn_hi)
+ah_bbn_opt = brentq(lambda ah: np.log(bbn_geomean(N_SAT_FIX, ah)),
+                    ah_bbn_lo, ah_bbn_hi, xtol=1e-4)
+gm_ah_bbn  = bbn_geomean(N_SAT_FIX, ah_bbn_opt)
+print(f"SAT-2 (n=0.5 fix) BBN-constrained:  ah={ah_bbn_opt:.4f}, gm={gm_ah_bbn:.4f}")
+
 MODEL = "Hyperconical a-run"
+MODEL2 = "Hyp a-run SAT-2"
 
 def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1):
     """k_model: free params of the model being compared (1 for hyperconical).
@@ -248,3 +270,9 @@ row4("BAO+SN",     "ΛCDM (1-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcd
 # 2-par LCDM reference: k_model=k_lcdm=2 so DAIC=0 (self-reference for BBN group)
 # Omega_r is calibrated by BBN (not fitted to BAO/SN); chi2 values same as 1-par (Omega_r negligible at DESI z)
 row4("BAO+SN+BBN", "ΛCDM (2-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcdm, "1", k_model=2, k_lcdm=2)
+print("-"*110)
+print("  SAT-2 (n=1/2 fix, alpha_h free) — exploratory parametrisation for alpha+gamma_U running")
+zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bao_opt))
+row4("BAO+SN",     MODEL2, f"ah={ah_bao_opt:.4f}", zf, Ef, f"~{gm_ah_bao:.2f}", k_lcdm=1)
+zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
+row4("BAO+SN+BBN", MODEL2, f"ah={ah_bbn_opt:.4f}", zf, Ef, f"{gm_ah_bbn:.4f}", k_lcdm=2)
