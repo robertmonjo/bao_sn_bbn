@@ -235,6 +235,22 @@ def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
     ratio  = _H0_SI * E_BBN / _H_std(T_arr)
     return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
 
+# ── BBN likelihood ─────────────────────────────────────────────────────────────
+# σ_H/H from primordial Y_p: Aver, Olive & Skillman 2021 (arXiv:2010.04180),
+# Yp=0.2453±0.0034, dYp/dNeff≈0.013 → σ(Neff)≈0.26 → σH/H=σ(Neff)/(2×3.046)≈4%.
+# Consistent with Fields, Olive, Yeh & Young 2020 (arXiv:1912.01132, JCAP 03,010):
+# Nν=2.86±0.15 from BBN alone → σH/H≈2.5% (tighter, includes CMB priors).
+SIGMA_H_BBN = 0.04   # 4% (1σ), conservative: Y_p alone, no CMB N_eff prior
+
+def chi2_bbn(gm_val, sigma_H=SIGMA_H_BBN):
+    """χ²_BBN = ((gm−1)/σ_H)²: one effective BBN data point.
+
+    gm_val is the geometric mean of H_model(T)/H_std(T) over T=0.07-0.10 MeV.
+    σ_H=0.04 from Aver et al. 2021 (arXiv:2010.04180).
+    ΛCDM satisfies BBN exactly (gm=1), so χ²_BBN(ΛCDM)=0.
+    """
+    return float((gm_val - 1.) ** 2 / sigma_H ** 2)
+
 # Find optimal n for BAO-only and joint
 res_n_bao = minimize_scalar(
     lambda n: chi2_bao(*E_hippopede(sat(n))), bounds=(0.05, 0.8), method="bounded")
@@ -279,11 +295,13 @@ print(f"SAT-2 (n=0.5 fix) BBN-constrained:  ah={ah_bbn_opt:.4f}, gm={gm_ah_bbn:.
 MODEL = "Hyperconical a-run"
 MODEL2 = "Hyp a-run SAT-2"
 
-def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1):
+def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1, c2_bbn=0.0):
     """k_model: free params of the model being compared (1 for hyperconical).
        k_lcdm:  free params of the ΛCDM reference (1 for non-BBN rows, 2 for BBN rows).
-       ΔAIC_tot = Δχ²_tot + 2*(k_model - k_lcdm); ΔAIC_BAO/SN are pure Δχ² components."""
-    c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef); c2j = c2b + c2s
+       c2_bbn:  χ²_BBN = ((gm-1)/σ_H)² with σ_H=SIGMA_H_BBN (0 for non-BBN rows).
+       ΔAIC_tot = Δ(χ²_BAO+χ²_SN+χ²_BBN) + 2*(k_model - k_lcdm);
+       Δχ²_BAO and Δχ²_SN are pure per-dataset differences (no parameter penalty)."""
+    c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef); c2j = c2b + c2s + c2_bbn
     nb = c2b / DOF_BAO; ns = c2s / DOF_SN
     db = c2b - c2b_jnt; ds = c2s - c2s_jnt
     dj = (c2j - c2j_lcdm) + 2*(k_model - k_lcdm)
@@ -304,10 +322,12 @@ zf, Ef = E_hippopede(sat(n_joint_opt))
 row4("BAO+SN",     MODEL, f"n={n_joint_opt:.3f}", zf, Ef, f"~{gm_joint:.1f}", k_lcdm=1)
 
 zf, Ef = E_hippopede(sat(n_bbn_opt))
-row4("BAO+BBN",    MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2)
+row4("BAO+BBN",    MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2,
+     c2_bbn=chi2_bbn(gm_bbn_opt))
 
 zf, Ef = E_hippopede(sat(n_bbn_opt))
-row4("BAO+SN+BBN", MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2)
+row4("BAO+SN+BBN", MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2,
+     c2_bbn=chi2_bbn(gm_bbn_opt))
 
 zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
 print("-"*110)
@@ -337,4 +357,5 @@ row4("BAO+SN",     MODEL2+" (0-par)", "ah=1/2 (fix)", zf0, Ef0, f"~{gm0:.1f}", k
 zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bao_opt))
 row4("BAO+SN",     MODEL2, f"ah={ah_bao_opt:.4f}", zf, Ef, f"~{gm_ah_bao:.2f}", k_lcdm=1)
 zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
-row4("BAO+SN+BBN", MODEL2, f"ah={ah_bbn_opt:.4f}", zf, Ef, f"{gm_ah_bbn:.4f}", k_lcdm=2)
+row4("BAO+SN+BBN", MODEL2, f"ah={ah_bbn_opt:.4f}", zf, Ef, f"{gm_ah_bbn:.4f}", k_lcdm=2,
+     c2_bbn=chi2_bbn(gm_ah_bbn))
