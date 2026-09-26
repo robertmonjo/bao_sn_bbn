@@ -17,6 +17,32 @@ from hyperconical_model import ExtendedProjectedHyperconical
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
 
+# ── BBN physical constants ─────────────────────────────────────────────────────
+_T0_EV      = 2.7255 * 8.617333262e-5         # CMB temperature in eV
+_H0_SI      = 70.0 / 3.0856775814913673e19    # H0=70 km/s/Mpc in s^-1
+_MPL_GEV    = 1.220890e19                      # Planck mass in GeV
+_HBAR_GEV_S = 6.582119569e-25                 # ℏ in GeV·s
+_T_BBN_LO, _T_BBN_HI = 0.07, 0.10            # BBN window in MeV
+
+# Fermi-Dirac energy integral table for g*(T): built once at import.
+# h(x) = (120/7π⁴) ∫ u² √(u²+x²)/(e^{√(u²+x²)}+1) du, x=m_e/T.
+_fd_u = np.linspace(1e-5, 60., 5000)
+_fd_x = np.unique(np.concatenate([np.linspace(0,1,60), np.linspace(1,5,100), np.linspace(5,20,60)]))
+_fd_eps = np.sqrt(_fd_u[None,:]**2 + _fd_x[:,None]**2)      # (n_x, n_u)
+_fd_h = (120./(7.*np.pi**4)) * _trapz(
+    _fd_u**2 * _fd_eps / (np.exp(np.minimum(_fd_eps, 500.)) + 1.), _fd_u, axis=1)
+
+def _g_star(T_mev):
+    x_e = 0.511 / np.asarray(T_mev, float)
+    h_e = np.interp(x_e, _fd_x, _fd_h, left=1., right=0.)
+    nu4 = ((4. + 7.*h_e) / 11.) ** (4./3.)
+    return 2. + (7./8.)*4.*h_e + (7./8.)*6.*nu4
+
+def _H_std(T_mev):
+    """Standard radiation-dominated H(T) [s^-1] from Kolb & Turner."""
+    T_gev = np.asarray(T_mev, float) / 1000.
+    return 1.66 * np.sqrt(_g_star(T_mev)) * T_gev**2 / (_MPL_GEV * _HBAR_GEV_S)
+
 # ── data ─────────────────────────────────────────────────────────────────────
 DATA = ROOT / "data" / "Ardra"
 rows = list(csv.DictReader(open(DATA / "desi_dr1_bao_galqso_lya_mean.csv")))
@@ -115,6 +141,56 @@ print(f"ΛCDM joint: Ω_m={res_jnt.x:.4f}, χ²_joint={c2j_lcdm:.4f}")
 def sat(n):   return lambda z: ALPHA_HIGH - (ALPHA_HIGH-ALPHA_LOW)*(1+z)**(-n)
 def pade(al,zc): return lambda z: al + (ALPHA_HIGH-al)*z/(z+zc)
 
+def _e_sat_on_grid(n, z_eval):
+    """E(z)/E(0) for SAT running-alpha on a provided z_eval grid (must start at 0).
+
+    Numerically stable only for z_eval well below z_BBN~3e8; beyond ~1e7 the
+    rhat→pi saturation kills the gradient.  Use bbn_geomean for BBN extrapolation.
+    """
+    z = np.asarray(z_eval, float)
+    model = ExtendedProjectedHyperconical(alpha=ALPHA_LOW)
+    x   = model.x_from_lz(np.log1p(z))
+    u   = np.sqrt(np.maximum(1./model.k - x**2, 1e-14))
+    y   = np.arctan2(x, u)
+    az  = sat(n)(z)
+    g   = np.maximum(1. - y/model.y0, 1e-12)
+    t   = (y/2.) / (g**az)
+    rhat = 2.*np.arctan(t)
+    dr  = np.gradient(rhat, z, edge_order=2)
+    dr  = np.where(np.abs(dr) < 1e-18, np.sign(dr)*1e-18 + (dr == 0.)*1e-18, dr)
+    h   = 1./dr
+    return h / h[0]   # h[0] = 1 by geometry (drhat/dz|_{z=0} = 1 for any alpha)
+
+def bbn_geomean(n, n_T=80, z_fit_min=1e3, z_fit_max=1e6):
+    """Geometric mean of H_perc(T)/H_std(T) over T=0.07-0.10 MeV.
+
+    Mirrors hippopede's analyze_bbn(): fit E(z) ~ C*(1+z)^nu at z=10^3-10^6
+    where the projection is numerically stable, then extrapolate to z_BBN~3e8.
+    This avoids the rhat->pi floating-point saturation at z=3e8.
+    """
+    z_fit = np.logspace(np.log10(z_fit_min), np.log10(z_fit_max), 200)
+    z_eval = np.unique(np.concatenate([
+        np.linspace(0., 1., 400),
+        np.geomspace(1., z_fit_max * 1.02, 5000),
+    ]))
+    e_run = _e_sat_on_grid(n, z_eval)
+    e_at_fit = np.interp(z_fit, z_eval, e_run)
+
+    # Fit log E = log_C + nu * log(1+z)  →  power law E ~ C*(1+z)^nu
+    log_e = np.log(np.maximum(e_at_fit, 1e-30))
+    log_1pz = np.log1p(z_fit)
+    A = np.column_stack([np.ones_like(log_1pz), log_1pz])
+    coeff, *_ = np.linalg.lstsq(A, log_e, rcond=None)
+    C_run = np.exp(coeff[0])
+    nu    = coeff[1]
+
+    # Extrapolate to BBN temperatures (z~3e8)
+    T_arr = np.geomspace(_T_BBN_LO, _T_BBN_HI, n_T)
+    z_arr = T_arr * 1.e6 / _T0_EV - 1.
+    H_perc = _H0_SI * C_run * (1. + z_arr)**nu
+    ratio  = H_perc / _H_std(T_arr)
+    return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
+
 # Find optimal n for BAO-only and joint
 res_n_bao = minimize_scalar(
     lambda n: chi2_bao(*E_hippopede(sat(n))), bounds=(0.05, 0.8), method="bounded")
@@ -125,13 +201,18 @@ n_joint_opt = res_n_joint.x
 print(f"\nSat BAO-optimal  n={n_bao_opt:.4f}, chi2_BAO={chi2_bao(*E_hippopede(sat(n_bao_opt))):.4f}")
 print(f"Sat joint-optimal n={n_joint_opt:.4f}, chi2_joint={res_n_joint.fun:.4f}")
 
-# BBN geomean from analyze_hippopede_dipole_bbn.py (z~3e8, numerically verified):
-#   n≈0.353 → geomean ≈ 0.14 (interpolated from n=0.355 → 0.141)
-#   n=0.468 → geomean = 1.002 (calibration zero)
-gm_bao = 0.14
-gm_bbn = 1.002
+print("Computing BBN normalisations (z~3e8) ...")
+gm_bao   = bbn_geomean(n_bao_opt)
+gm_joint = bbn_geomean(n_joint_opt)
+print(f"  n_bao={n_bao_opt:.4f} -> gm={gm_bao:.4f};  n_joint={n_joint_opt:.4f} -> gm={gm_joint:.4f}")
 
-MODEL = "Hyperconical α-run"
+# Find n_bbn_opt: the unique n in (0.04, 0.12) where gm_bbn = 1.
+# gm(0.04)<1<gm(0.12) from the sweep; use bisection on log(gm).
+n_bbn_opt    = brentq(lambda n: np.log(bbn_geomean(n)), 0.04, 0.12, xtol=1e-4)
+gm_bbn_opt   = bbn_geomean(n_bbn_opt)
+print(f"  n_bbn_opt={n_bbn_opt:.4f} (gm={gm_bbn_opt:.4f})")
+
+MODEL = "Hyperconical a-run"
 
 def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1):
     """k_model: free params of the model being compared (1 for hyperconical).
@@ -150,16 +231,16 @@ print(f"  1-par ΛCDM ref: Ω_m={res_jnt.x:.4f} (joint BAO+SN)  |  2-par ΛCDM r
 print("-"*110)
 
 zf, Ef = E_hippopede(sat(n_bao_opt))
-row4("BAO",        MODEL, f"n={n_bao_opt:.3f}", zf, Ef, f"~{gm_bao:.2f}", k_lcdm=1)
+row4("BAO",        MODEL, f"n={n_bao_opt:.3f}", zf, Ef, f"~{gm_bao:.1f}", k_lcdm=1)
 
 zf, Ef = E_hippopede(sat(n_joint_opt))
-row4("BAO+SN",     MODEL, f"n={n_joint_opt:.3f}", zf, Ef, "<0.14", k_lcdm=1)
+row4("BAO+SN",     MODEL, f"n={n_joint_opt:.3f}", zf, Ef, f"~{gm_joint:.1f}", k_lcdm=1)
 
-zf, Ef = E_hippopede(sat(0.468))
-row4("BAO+BBN",    MODEL, "n=0.468", zf, Ef, f"{gm_bbn:.3f}", k_lcdm=2)
+zf, Ef = E_hippopede(sat(n_bbn_opt))
+row4("BAO+BBN",    MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2)
 
-zf, Ef = E_hippopede(sat(0.468))
-row4("BAO+SN+BBN", MODEL, "n=0.468", zf, Ef, f"{gm_bbn:.3f}", k_lcdm=2)
+zf, Ef = E_hippopede(sat(n_bbn_opt))
+row4("BAO+SN+BBN", MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2)
 
 zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
 print("-"*110)
