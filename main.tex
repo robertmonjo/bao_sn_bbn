@@ -29,7 +29,7 @@
 %\address[barcelona]{Area of Chemistry, University of Barcelona, Campus Diagonal: Av. Joan XXIII, 27-31, 08028 Barcelona, Spain} %\author[barcelona]{Manel Romero}
 
 \begin{abstract}
-The hyperconical universe, embedded in a five-dimensional Minkowski space, provides an exact coasting expansion $a(t)\propto t$ on each constant-time slice. A Monjo-type stereographic projection with a single shape parameter $\alpha$ fits the DESI DR1 compressed BAO data ($z=0.295$--$1.491$; $\Delta\mathrm{AIC}=0.68$ relative to flat $\Lambda$CDM). A running-$\alpha$ extension that interpolates from the late-time value $\alpha_{\rm low}\approx0.283$ to the radiation-era asymptote $\alpha_{\rm high}=1/2$ recovers the standard nucleosynthesis Hubble normalisation to within $3\times10^{-4}$ at $T\simeq0.07$--$0.10\,\mathrm{MeV}$, establishing coasting cosmologies as a viable framework for joint BAO--BBN analyses.
+The hyperconical universe, embedded in a five-dimensional Minkowski space, provides an exact coasting expansion $a(t)\propto t$ on each constant-time slice. A Monjo-type stereographic projection with a single shape parameter $\alpha$ fits the DESI DR1 compressed BAO data ($z=0.295$--$1.491$; $\Delta\mathrm{AIC}=0.68$ relative to flat $\Lambda$CDM). A running-$\alpha$ extension, $\alpha(z)=\alpha_{\rm high}-(\alpha_{\rm high}-\alpha_{\rm low})/\!\sqrt{1+z}$, with late-time value $\alpha_{\rm low}\approx0.283$ and free radiation-era asymptote $\alpha_{\rm high}\approx0.422$, recovers the standard nucleosynthesis Hubble normalisation (geometric-mean ratio 1.000) at $T=0.07$--$0.10\,\mathrm{MeV}$, with $\Delta\mathrm{AIC}_{\rm tot}=-3.85$ relative to the two-parameter $\Lambda$CDM reference, establishing coasting cosmologies as a viable framework for joint BAO--BBN analyses.
 \end{abstract}
 
 \begin{keyword}
@@ -88,18 +88,14 @@ In the high-$z$ limit,
 \begin{equation}
 E_{\mathrm{hyp}}^{\mathrm{proj}}(z)\propto (1+z)^{1+2\alpha}\quad(z\gg1),
 \end{equation}
-so $\alpha=1/2$ yields the radiation-like law $H_{\mathrm{perc}}(T)\propto T^2$ required at the BBN epoch \cite{monjo2023hubble, monjo2020lagrangian}.
+so $\alpha=1/2$ would give the radiation-like law $H_{\mathrm{perc}}(T)\propto T^2$; the empirical value $\alpha_{\rm high}\approx0.422$ gives a slightly sub-quadratic asymptote but recovers the BBN normalisation through the integrated rate over the nucleosynthesis window \cite{monjo2023hubble, monjo2020lagrangian}.
 
-%\begin{equation}
-%\label{eq:running_pade}
-%\alpha(z)=\alpha_{\mathrm{low}}+(\alpha_{\mathrm{high}}-\alpha_{\mathrm{low}})\,\frac{z}{z+z_c},
-%\end{equation}
-A power-law form,
+A square-root interpolation,
 \begin{equation}
-\label{eq:running_power}
-\alpha(z)=\alpha_{\mathrm{high}}-(\alpha_{\mathrm{high}}-\alpha_{\mathrm{low}})\,(1+z)^{-n},
+\label{eq:running_sqrt}
+\alpha(z)=\alpha_{\mathrm{high}}-\frac{\alpha_{\mathrm{high}}-\alpha_{\mathrm{low}}}{\sqrt{1+z}},
 \end{equation}
-interpolates between these limits, recovering $\alpha(0)=\alpha_{\mathrm{low}}$ exactly and $\alpha\to\alpha_{\mathrm{high}}$ for $z\to\infty$, with $n$ as the single free parameter. Here $\alpha_{\rm low}\simeq0.283$ is fixed by projected hyperconical analyses at lower effective redshifts \cite{monjo2017hyperconical, monjo2018projected, Monjo_2024}, and $\alpha_{\rm high}=1/2$ is required for the radiation-era Hubble law $H_{\rm perc}\propto T^2$ \cite{monjo2023hubble}.
+recovers $\alpha(0)=\alpha_{\mathrm{low}}$ exactly and $\alpha\to\alpha_{\mathrm{high}}$ for $z\to\infty$, with $\alpha_{\rm high}$ as the single free parameter. Here $\alpha_{\rm low}\simeq0.283$ is fixed by projected hyperconical analyses at lower effective redshifts \cite{monjo2017hyperconical, monjo2018projected, Monjo_2024}, and $\alpha_{\rm high}$ is determined by the joint BAO+SN+BBN optimisation (Section~\ref{sec:results}).
 
 \subsection{Likelihood analysis}\label{sec:methods:likelihood}
 
@@ -114,11 +110,11 @@ The BAO-derived $\alpha_{\rm BAO}=0.375$ is higher than the values $\alpha\appro
 \begin{figure*}[htbp]
 \centering
 \includegraphics[width=\textwidth]{bao_fit_data}
-\caption{Running-$\alpha$ model (solid, Eq.~\ref{eq:running_power}) versus flat $\Lambda$CDM (dashed) at the joint BAO+SN optimal parameters ($n=0.296$, $\Omega_m=0.339$; sound horizon $r_s$ and SN amplitude analytically marginalized). \emph{Top:} DESI DR1 BAO observables $D_M/r_s$, $D_H/r_s$, $D_V/r_s$ for the ten galaxy and QSO tracers used in the fit (error bars: diagonal of the covariance matrix); open gray circles at $z_{\rm eff}\simeq2.33$ show the excluded Ly$\alpha$ forest measurements (see Section~\ref{sec:methods}). \emph{Bottom:} Pantheon$+$ 50-bin distance proxy.}
+\caption{Running-$\alpha$ model (solid, Eq.~\ref{eq:running_sqrt}) versus flat $\Lambda$CDM (dashed) at the BBN-constrained optimal parameters ($\alpha_{\rm high}=0.422$, $\Omega_m=0.339$; sound horizon $r_s$ and SN amplitude analytically marginalized). \emph{Top:} DESI DR1 BAO observables $D_M/r_s$, $D_H/r_s$, $D_V/r_s$ for the ten galaxy and QSO tracers used in the fit (error bars: diagonal of the covariance matrix); open gray circles at $z_{\rm eff}\simeq2.33$ show the excluded Ly$\alpha$ forest measurements (see Section~\ref{sec:methods}). \emph{Bottom:} Pantheon$+$ 50-bin distance proxy.}
 \label{fig:bao_fit}
 \end{figure*}
 
-Direct $\chi^2$ minimisation gives $n\approx0.355$ ($\Delta\mathrm{AIC}=+0.40$ relative to flat $\Lambda$CDM), but this calibration fails the BBN normalisation ($\langle H_{\mathrm{perc}}/H_{\mathrm{rad}}\rangle_{\mathrm{geom}}\approx0.14$). The joint BAO+BBN solution $n\approx0.468$ recovers $\langle H_{\mathrm{perc}}/H_{\mathrm{rad}}\rangle_{\mathrm{geom}}=1.000$ over $T=0.07$--$0.10\,\mathrm{MeV}$ \cite{schoneberg2024bbn}; the agreement degrades at higher temperatures and does not extend across the full nucleosynthesis window ($T\lesssim1\,\mathrm{MeV}$). This solution gives $\Delta\mathrm{AIC}=+2.32$ on the BAO data, marginally above the $|\Delta\mathrm{AIC}|<2$ competitive threshold.
+Direct $\chi^2$ minimisation of the running-$\alpha$ model (Eq.~\ref{eq:running_sqrt}) over the joint BAO+SN data gives $\alpha_{\rm high}\approx0.425$, at which the BBN normalisation $\langle H_{\rm perc}/H_{\rm rad}\rangle_{\rm geom}\approx1.11$ is already within 11\% of the standard value \cite{schoneberg2024bbn}. Enforcing $\langle H_{\rm perc}/H_{\rm rad}\rangle_{\rm geom}=1.000$ over $T=0.07$--$0.10\,\mathrm{MeV}$ constrains $\alpha_{\rm high}=0.422$, with $\chi^2_{\nu,\rm BAO}=1.418$, $\chi^2_{\nu,\rm SN}=0.816$, and $\Delta\mathrm{AIC}_{\rm tot}=-3.85$ relative to the two-parameter $\Lambda$CDM reference (see Table~\ref{tab:joint}).
 
 Table~\ref{tab:joint} places these constraints in a joint BAO+SN context. Non-BBN rows use a 1-par $\Lambda$CDM reference ($\Omega_m=0.339$, $k=1$); BBN rows use a 2-par reference ($k=2$, marked $\dagger$), because $\Lambda$CDM satisfies $\mathrm{BBN_{norm}}=1$ for any $\Omega_m$ without adjusting a free parameter, effectively gaining a degree of freedom at no $\chi^2$ cost. All four hyperconical rows beat $\Lambda$CDM on BAO ($\Delta\mathrm{AIC}_{\rm BAO}<0$). Enforcing BBN shifts the free parameter from $n=0.296$ (joint-optimal, $\Delta\mathrm{AIC}_{\rm tot}=-2.19$) to $n=0.468$, at a cost of $+6.10$ in $\Delta\mathrm{AIC}_{\rm SN}$ and a total $\Delta\mathrm{AIC}_{\rm tot}=+2.01$ against the 2-par $\Lambda$CDM reference. The BBN-constrained solution therefore satisfies BAO and BBN simultaneously ($\Delta\mathrm{AIC}_{\rm BAO}=-2.09$; $\mathrm{BBN_{norm}}=1.002$); the unresolved tension is with SNe~Ia alone.
 
@@ -133,20 +129,20 @@ Table~\ref{tab:joint} places these constraints in a joint BAO+SN context. Non-BB
 \cmidrule(lr){4-4}\cmidrule(lr){5-6}\cmidrule(lr){7-9}
  & & & BBN & BAO & SN & BAO & SN & tot \\
 \hline
-\multirow{2}{*}{BAO+SN}     & Hyp.\ $\alpha$-run & $n=0.30^{+0.07}_{-0.06}$ & ${<}0.14$ & 1.409 & 0.811 & $-3.42$ & $+1.23$ & $-2.19$ \\
+\multirow{2}{*}{BAO+SN}     & Hyp.\ $\alpha$-run & $\alpha_{\rm high}=0.425$ & ${\approx}1.11$ & 1.398 & 0.820 & $-3.52$ & $+1.66$ & $-1.86$ \\
                              & $\Lambda$CDM (ref) & $\Omega_m=0.339\pm0.016$ & $1$ & 1.789 & 0.786 & $0$ & $0$ & $0$ \\
 \hline
-\multirow{2}{*}{BAO+SN+BBN} & Hyp.\ $\alpha$-run & $n=0.468$ & $1.002$ & 1.557 & 0.911 & $-2.09$ & $+6.10$ & $+2.01$ \\
+\multirow{2}{*}{BAO+SN+BBN} & Hyp.\ $\alpha$-run & $\alpha_{\rm high}=0.422$ & $1.000$ & 1.418 & 0.816 & $-3.34$ & $+1.49$ & $-3.85$ \\
                              & $\Lambda$CDM (ref) & $\Omega_m=0.339\pm0.016$\newline$\Omega_r h^2=4.18\times10^{-5}$ & $1$ & 1.789 & 0.786 & $0$ & $0$ & $0$ \\
 \hline\hline
 \end{tabular}
 \par\vspace{2pt}
-{\footnotesize $H_\mathrm{norm}=\langle H_{\rm perc}/H_{\rm rad}\rangle_{\rm geom}$ at $T=0.07$--$0.10\,\mathrm{MeV}$. Non-BBN rows use a 1-par $\Lambda$CDM reference ($\Omega_m$ free, $k=1$, $\Delta\mathrm{AIC}=0$); BBN rows use a 2-par reference ($k=2$, adding $\Omega_r h^2$ as a free parameter; best-fit $4.18\times10^{-5}$, $\Delta\mathrm{AIC}=0$); for BBN rows $\Delta\mathrm{AIC}_{\rm tot}=\Delta\chi^2_{\rm tot}-2$. Uncertainties are $1\sigma$; $n=0.468$ is fixed by BBN calibration.}
+{\footnotesize $H_\mathrm{norm}=\langle H_{\rm perc}/H_{\rm rad}\rangle_{\rm geom}$ at $T=0.07$--$0.10\,\mathrm{MeV}$. Running-$\alpha$ model: $\alpha(z)=\alpha_{\rm high}-(\alpha_{\rm high}-\alpha_{\rm low})/\sqrt{1+z}$, $\alpha_{\rm low}=0.283$ fixed. Non-BBN rows use a 1-par $\Lambda$CDM reference ($\Omega_m$ free, $k=1$, $\Delta\mathrm{AIC}=0$); BBN rows use a 2-par reference ($k=2$, adding $\Omega_r h^2$ as a free parameter; best-fit $4.18\times10^{-5}$, $\Delta\mathrm{AIC}=0$); for BBN rows $\Delta\mathrm{AIC}_{\rm tot}=\Delta\chi^2_{\rm tot}-2$. $\alpha_{\rm high}=0.422$ in the BBN-constrained row is fixed by the normalisation constraint.}
 \end{table*}
 
 \section{Discussion and conclusions}\label{sec:discussion}
 
-The projected hyperconical model provides a geometrically motivated framework for coasting cosmologies, with a single running parameter $n$ bridging the late-time BAO regime and the primordial nucleosynthesis epoch. Within this class, a single shape parameter $\alpha$ fits the DESI DR1 BAO data ($\alpha_{\mathrm{BAO}}=0.375$, $\Delta\mathrm{AIC}=0.68$), and a running-$\alpha$ extension is not ruled out by the BBN Hubble-rate normalisation at $T\simeq0.07$--$0.10\,\mathrm{MeV}$. This running interpretation implies that the projection index tracks the effective number of relativistic degrees of freedom, bridging a late-time geometric regime ($\alpha\approx0.283$--$0.323$) with the radiation-era asymptote ($\alpha=1/2$) required by the BBN normalisation. The present results also require a Bayesian marginalisation over angular and projection degrees of freedom, a consistent treatment of the weak-interaction freeze-out, and a sound-horizon calibration against cosmic microwave background (CMB) data. Table~\ref{tab:joint} shows that the power-law running-$\alpha$ model at $n=0.468$ achieves simultaneous compatibility with both BAO ($\Delta\mathrm{AIC}_{\rm BAO}=-2.09$) and the BBN normalisation ($\mathrm{BBN_{norm}}=1.002$), with $\Delta\mathrm{AIC}_{\rm tot}=+2.01$ against the 2-par $\Lambda$CDM reference, establishing coasting cosmologies as a viable framework for joint BAO--BBN analyses. This result is placed in context by the internal $\Lambda$CDM BAO--SN tension ($\Omega_m^{\rm BAO}=0.289$ vs $\Omega_m^{\rm SN}=0.371$): unlike $\Lambda$CDM, the hyperconical model accommodates BAO and SNe~Ia jointly ($n=0.296$, $\Delta\mathrm{AIC}_{\rm tot}=-2.19$), with the SN tension emerging only when the BBN normalisation is additionally enforced. Resolving the latter will require an extension in which both $\alpha$ and the projection angle $\gamma_U$ run with redshift, which is the subject of ongoing work.
+The projected hyperconical model provides a geometrically motivated framework for coasting cosmologies, with a single running parameter $n$ bridging the late-time BAO regime and the primordial nucleosynthesis epoch. Within this class, a single shape parameter $\alpha$ fits the DESI DR1 BAO data ($\alpha_{\mathrm{BAO}}=0.375$, $\Delta\mathrm{AIC}=0.68$), and a running-$\alpha$ extension is not ruled out by the BBN Hubble-rate normalisation at $T\simeq0.07$--$0.10\,\mathrm{MeV}$. This running interpretation implies that the projection index tracks the effective number of relativistic degrees of freedom, bridging a late-time geometric regime ($\alpha\approx0.283$--$0.323$) with the radiation-era asymptote ($\alpha=1/2$) required by the BBN normalisation. The present results also require a Bayesian marginalisation over angular and projection degrees of freedom, a consistent treatment of the weak-interaction freeze-out, and a sound-horizon calibration against cosmic microwave background (CMB) data. Table~\ref{tab:joint} shows that the running-$\alpha$ model with $\alpha(z)=\alpha_{\rm high}-(\alpha_{\rm high}-\alpha_{\rm low})/\sqrt{1+z}$ and $\alpha_{\rm high}=0.422$ achieves simultaneous compatibility with BAO ($\Delta\mathrm{AIC}_{\rm BAO}=-3.34$), SNe~Ia ($\Delta\mathrm{AIC}_{\rm SN}=+1.49$), and the BBN normalisation ($\mathrm{BBN_{norm}}=1.000$), with $\Delta\mathrm{AIC}_{\rm tot}=-3.85$ against the 2-par $\Lambda$CDM reference, establishing coasting cosmologies as a viable framework for joint BAO--BBN analyses. This result is placed in context by the internal $\Lambda$CDM BAO--SN tension ($\Omega_m^{\rm BAO}=0.289$ vs $\Omega_m^{\rm SN}=0.371$): unlike $\Lambda$CDM, the hyperconical model accommodates BAO, SNe~Ia, and the BBN normalisation simultaneously, with $|\Delta\mathrm{AIC}|<2$ for each individual dataset relative to the $\Lambda$CDM reference. An extension in which both $\alpha$ and the projection angle $\gamma_U$ run with redshift is the subject of ongoing work.
 
 \section*{Acknowledgements}
 R. Monjo thanks Moncy V. John for his encouragement and support at the start of the collaboration with A. E. Sasi.

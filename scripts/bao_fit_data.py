@@ -2,11 +2,13 @@
 
 3+1 panel layout:
   Top row (3 panels): DM/rs, DH/rs, DV/rs vs DESI DR1 BAO data (all 12 points).
-    Running-alpha model at n=0.296 (joint BAO+SN optimal); LCDM at Omega_m=0.339.
+    Running-alpha model at alpha_high=0.422 (BBN-constrained); LCDM at Omega_m=0.339.
   Bottom row (1 panel, full width): Pantheon+ 50-bin SN distance proxy.
-    Same model parameters: n=0.296, Omega_m=0.339.
+    Same model parameters: alpha_high=0.422, Omega_m=0.339.
 
-Running-alpha: alpha(z) = alpha_high - (alpha_high - alpha_low) * (1+z)^{-n}
+Running-alpha (sqrt interpolation):
+  alpha(z) = alpha_high - (alpha_high - alpha_low) / sqrt(1+z)
+  Implemented as: (1+z)^{-n} with n=0.5.
 """
 
 from __future__ import annotations
@@ -35,8 +37,9 @@ if str(SCRIPT_ROOT) not in sys.path:
 from hyperconical_model import ExtendedProjectedHyperconical  # noqa: E402
 
 # ── constants ────────────────────────────────────────────────────────────────
-ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
-N_JOINT = 0.296   # running-alpha joint BAO+SN optimal n (used for all panels)
+ALPHA_LOW  = 0.283
+ALPHA_HIGH = 0.4224   # BBN-constrained alpha_high (sqrt interpolation, gm=1.000)
+N_SQRT     = 0.5      # fixed exponent: (1+z)^{-0.5} = 1/sqrt(1+z)
 OMEGA_M_LCDM_JNT = 0.339   # LCDM joint BAO+SN optimal (used for all panels)
 
 # ── load BAO data ────────────────────────────────────────────────────────────
@@ -68,10 +71,10 @@ sigma_all = np.sqrt(np.diag(cov_raw))   # 1-sigma from covariance diagonal
 Z_MAX = max(z_bao.max(), z_sn.max()) * 1.01
 
 # ── running-alpha E(z) ───────────────────────────────────────────────────────
-def E_running(n: float, z_arr: np.ndarray) -> np.ndarray:
-    """E(z) for power-law running-alpha model at parameter n."""
+def E_running(n: float, z_arr: np.ndarray, ah: float = ALPHA_HIGH) -> np.ndarray:
+    """E(z) for sqrt running-alpha model: alpha(z)=ah-(ah-al)/sqrt(1+z)."""
     model = ExtendedProjectedHyperconical(alpha=ALPHA_LOW)
-    az = ALPHA_HIGH - (ALPHA_HIGH - ALPHA_LOW) * (1 + z_arr) ** (-n)
+    az = ah - (ah - ALPHA_LOW) * (1 + z_arr) ** (-n)
     x  = model.x_from_lz(np.log1p(z_arr))
     u  = np.sqrt(np.maximum(1.0 / model.k - x ** 2, 1e-14))
     y  = np.arctan2(x, u)
@@ -119,8 +122,8 @@ def A_opt(mv: np.ndarray) -> float:
 
 # ── dense z grids ────────────────────────────────────────────────────────────
 zf_bao  = np.linspace(0, Z_MAX, 4000)
-Ef_hyp_bao   = E_running(N_JOINT, zf_bao)
-Ef_hyp_joint = E_running(N_JOINT, zf_bao)
+Ef_hyp_bao   = E_running(N_SQRT, zf_bao)
+Ef_hyp_joint = E_running(N_SQRT, zf_bao)
 Ef_lcdm_bao  = E_lcdm(OMEGA_M_LCDM_JNT, zf_bao)
 Ef_lcdm_jnt  = E_lcdm(OMEGA_M_LCDM_JNT, zf_bao)
 
@@ -136,11 +139,11 @@ A_lcdm       = A_opt(mv_sn_lcdm)
 
 # ── continuous curves for plotting ───────────────────────────────────────────
 z_curve = np.linspace(0.05, 2.6, 400)
-Ec_hyp  = E_running(N_JOINT, z_curve)
+Ec_hyp  = E_running(N_SQRT, z_curve)
 Ec_lcdm = E_lcdm(OMEGA_M_LCDM_JNT, z_curve)
 
 zf4 = np.linspace(0, z_curve.max() * 1.01, 4000)
-Ef4_hyp  = E_running(N_JOINT, zf4)
+Ef4_hyp  = E_running(N_SQRT, zf4)
 Ef4_lcdm = E_lcdm(OMEGA_M_LCDM_JNT, zf4)
 
 def dc_curve(zv, zf, Ef):
@@ -158,7 +161,7 @@ dv_lcdm = np.array([beta_lcdm_b * (z * dc_curve(z, zf4, Ef4_lcdm) ** 2 / Ec_lcdm
 # SN curves
 z_sn_curve = np.linspace(0.01, z_sn.max() * 1.05, 300)
 zf_sn_fine = np.linspace(0, z_sn_curve.max() * 1.01, 3000)
-Ef_sn_hyp  = E_running(N_JOINT, zf_sn_fine)
+Ef_sn_hyp  = E_running(N_SQRT, zf_sn_fine)
 Ef_sn_lcdm = E_lcdm(OMEGA_M_LCDM_JNT, zf_sn_fine)
 # Normalise by A_hyp: data → d_proxy/A, model curves → D_C (no free amplitude)
 dc_sn_hyp  = np.array([dc_curve(z, zf_sn_fine, Ef_sn_hyp)  for z in z_sn_curve])
@@ -265,7 +268,7 @@ ax_sn_res.set_ylim(-5, 5)
 ax_legend.axis("off")
 legend_handles = [
     Line2D([0], [0], color=COL_HYP,  lw=1.8,
-           label=rf"Hyp. $\alpha$-run ($n={N_JOINT}$)"),
+           label=r"Hyp. $\alpha$-run ($\alpha_{\rm h}=0.422$)"),
     Line2D([0], [0], color=COL_LCDM, lw=1.4, ls="--",
            label=rf"$\Lambda$CDM ($\Omega_m={OMEGA_M_LCDM_JNT}$)"),
     Line2D([0], [0], color=COL_BAO, marker="o", ms=5, lw=1.2,
