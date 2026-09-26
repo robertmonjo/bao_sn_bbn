@@ -8,12 +8,11 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize_scalar, brentq
 
-ROOT = Path(r"C:\Users\rober\OneDrive\Documents\Codex_Portatil\00_projectes\hippopede")
+ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
-for p in [str(SCRIPTS), str(SCRIPTS / "obsolete_bbn")]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
-from analyze_hippopede_dipole_bbn import ExtendedProjectedHyperconical
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+from hyperconical_model import ExtendedProjectedHyperconical
 
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
