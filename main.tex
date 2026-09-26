@@ -103,7 +103,7 @@ interpolates between these limits, recovering $\alpha(0)=\alpha_{\mathrm{low}}$ 
 
 \subsection{Likelihood analysis}\label{sec:methods:likelihood}
 
-Statistical analyses keep $\alpha$ as the single geometric parameter. The fit quality is measured by $\chi^2=(\mathbf{D}^{\rm obs}-\mathbf{D}^{\rm model})^T C^{-1}(\mathbf{D}^{\rm obs}-\mathbf{D}^{\rm model})$, where $\mathbf{D}$ is the vector of measured distance ratios $\{D_M/r_s, D_H/r_s, D_V/r_s\}$ and $C$ is the DESI DR1 full covariance matrix across all BAO distance combinations. Nuisance parameters are eliminated analytically: for BAO the nuisance $\beta=c/(H_0 r_s)$ is minimized at each $\alpha$. For the supernova data, the $\chi^2$ is $\chi^2_{\rm SN}=\sum_i [d_{\rm proxy}(z_i)-A\,D_C^{\rm model}(z_i)]^2/\sigma_{d,i}^2$, where $A$ is marginalized analytically. The joint figure of merit is $\chi^2_{\rm joint}=\chi^2_{\rm BAO}+\chi^2_{\rm SN}$, with $\nu_{\rm BAO}=9$ and $\nu_{\rm SN}=49$ degrees of freedom. For model comparison, flat $\Lambda$CDM with free $\Omega_m$ and the same nuisance marginalizations is fitted to the same data, with the Akaike Information Criterion (AIC; \cite{burnham2002model}) adopting $|\Delta\mathrm{AIC}|<2$ as the threshold for indistinguishable model performance.
+Statistical analyses keep $\alpha$ as the single geometric parameter. The fit quality is measured by $\chi_{\rm BAO}^2=(\mathbf{D}^{\rm obs}-\mathbf{D}^{\rm model})^T C^{-1}(\mathbf{D}^{\rm obs}-\mathbf{D}^{\rm model})$, where $\mathbf{D}$ is the vector of measured distance ratios $\{D_M/r_s, D_H/r_s, D_V/r_s\}$ and $C$ is the DESI DR1 full covariance matrix across all BAO distance combinations. Nuisance parameters are eliminated analytically: for BAO the nuisance $\beta=c/(H_0 r_s)$ is minimized at each $\alpha$. For the supernova data, $\chi^2_{\rm SN}=\sum_i [d_{\rm proxy}(z_i)-A\,D_C^{\rm model}(z_i)]^2/\sigma_{d,i}^2$, where $A$ is marginalized analytically. The joint figure of merit is $\chi^2_{\rm joint}=\chi^2_{\rm BAO}+\chi^2_{\rm SN}$, with $\nu_{\rm BAO}=9$ and $\nu_{\rm SN}=49$ degrees of freedom. For model comparison, flat $\Lambda$CDM with free $\Omega_m$ and the same nuisance marginalizations is fitted to the same data, with the Akaike Information Criterion (AIC; \cite{burnham2002model}) adopting $|\Delta\mathrm{AIC}|<2$ as the threshold for indistinguishable model performance.
 
 \section{Results}\label{sec:results}
 
@@ -165,6 +165,6 @@ The authors declare no competing interests.
 During the preparation of this work the authors used AI-assisted language tools to improve the readability of the manuscript. The authors reviewed and edited the content and take full responsibility for the publication.
 
 \bibliographystyle{elsarticle-num}
-\bibliography{main-bbn-hyperconical}
+\bibliography{main-ref}
 
 \end{document}
