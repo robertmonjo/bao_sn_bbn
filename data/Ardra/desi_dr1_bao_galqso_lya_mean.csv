@@ -1,0 +1,13 @@
+z,value,observable,label
+0.295,7.92512927,DV_over_rs,BGS
+0.510,13.62003080,DM_over_rs,LRG_z0
+0.510,20.98334647,DH_over_rs,LRG_z0
+0.706,16.84645313,DM_over_rs,LRG_z1
+0.706,20.07872919,DH_over_rs,LRG_z1
+0.930,21.70841761,DM_over_rs,LRGplusELG
+0.930,17.87612922,DH_over_rs,LRGplusELG
+1.317,27.78720817,DM_over_rs,ELG
+1.317,13.82372285,DH_over_rs,ELG
+1.491,26.07217182,DV_over_rs,QSO
+2.330,39.70838281,DM_over_rs,Lya
+2.330,8.52256583,DH_over_rs,Lya
