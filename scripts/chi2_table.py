@@ -161,34 +161,34 @@ def _e_sat_on_grid(n, z_eval):
     h   = 1./dr
     return h / h[0]   # h[0] = 1 by geometry (drhat/dz|_{z=0} = 1 for any alpha)
 
-def bbn_geomean(n, n_T=80, z_fit_min=1e3, z_fit_max=1e6):
+def bbn_geomean(n, n_T=80, z_ref=1e6):
     """Geometric mean of H_perc(T)/H_std(T) over T=0.07-0.10 MeV.
 
-    Mirrors hippopede's analyze_bbn(): fit E(z) ~ C*(1+z)^nu at z=10^3-10^6
-    where the projection is numerically stable, then extrapolate to z_BBN~3e8.
-    This avoids the rhat->pi floating-point saturation at z=3e8.
+    Analytical extrapolation: integrates nu(z) = 1 + 2*alpha(z) from z_ref to
+    z_BBN~3e8, where g propto (1+z)^{-2} is exact for the hyperconical metric.
+    This is more accurate than the power-law fit (which uses a transient nu from
+    the fit range z=10^3-10^6, where alpha is still running, overestimating E).
+
+    For SAT running alpha = alpha_high - (alpha_high-alpha_low)*(1+z)^{-n}:
+      integral_{z_ref}^{z} alpha dlnz = alpha_h*ln(r) + (alpha_h-alpha_l)/n *
+                                         ((1+z)^{-n} - (1+z_ref)^{-n})
+      log(E(z)/E(z_ref)) = ln(r) + 2 * integral
     """
-    z_fit = np.logspace(np.log10(z_fit_min), np.log10(z_fit_max), 200)
     z_eval = np.unique(np.concatenate([
         np.linspace(0., 1., 400),
-        np.geomspace(1., z_fit_max * 1.02, 5000),
+        np.geomspace(1., z_ref * 1.02, 5000),
     ]))
     e_run = _e_sat_on_grid(n, z_eval)
-    e_at_fit = np.interp(z_fit, z_eval, e_run)
-
-    # Fit log E = log_C + nu * log(1+z)  →  power law E ~ C*(1+z)^nu
-    log_e = np.log(np.maximum(e_at_fit, 1e-30))
-    log_1pz = np.log1p(z_fit)
-    A = np.column_stack([np.ones_like(log_1pz), log_1pz])
-    coeff, *_ = np.linalg.lstsq(A, log_e, rcond=None)
-    C_run = np.exp(coeff[0])
-    nu    = coeff[1]
+    E_ref = float(np.interp(z_ref, z_eval, e_run))
 
     # Extrapolate to BBN temperatures (z~3e8)
     T_arr = np.geomspace(_T_BBN_LO, _T_BBN_HI, n_T)
     z_arr = T_arr * 1.e6 / _T0_EV - 1.
-    H_perc = _H0_SI * C_run * (1. + z_arr)**nu
-    ratio  = H_perc / _H_std(T_arr)
+    ln_r = np.log((1. + z_arr) / (1. + z_ref))
+    integral_alpha = ALPHA_HIGH * ln_r + (ALPHA_HIGH - ALPHA_LOW) / n * (
+        (1. + z_arr)**(-n) - (1. + z_ref)**(-n))
+    E_BBN = E_ref * np.exp(ln_r + 2. * integral_alpha)
+    ratio  = _H0_SI * E_BBN / _H_std(T_arr)
     return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
 
 # Find optimal n for BAO-only and joint
