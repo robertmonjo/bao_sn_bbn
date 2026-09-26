@@ -162,6 +162,49 @@ def _e_sat_on_grid(n, z_eval, ah=ALPHA_HIGH):
     h   = 1./dr
     return h / h[0]   # h[0] = 1 by geometry (drhat/dz|_{z=0} = 1 for any alpha)
 
+def _e_const_on_grid(alpha, z_eval):
+    """E(z)/E(0) for constant alpha, using the full model geometry at that alpha.
+
+    Analogous to _e_sat_on_grid but uses ExtendedProjectedHyperconical(alpha=alpha)
+    (not ALPHA_LOW) for the geometry, and applies a constant exponent az=alpha.
+    Numerically stable up to z~10^6; use bbn_geomean_const for z >> 10^6.
+    """
+    z = np.asarray(z_eval, float)
+    model = ExtendedProjectedHyperconical(alpha=alpha)
+    x   = model.x_from_lz(np.log1p(z))
+    u   = np.sqrt(np.maximum(1./model.k - x**2, 1e-14))
+    y   = np.arctan2(x, u)
+    g   = np.maximum(1. - y/model.y0, 1e-12)
+    t   = (y/2.) / (g**alpha)
+    rhat = 2.*np.arctan(t)
+    dr  = np.gradient(rhat, z, edge_order=2)
+    dr  = np.where(np.abs(dr) < 1e-18, np.sign(dr)*1e-18 + (dr == 0.)*1e-18, dr)
+    h   = 1./dr
+    return h / h[0]
+
+def E_hippopede_const(alpha, n=3000):
+    """E(z) grid for constant-alpha hyperconical model."""
+    zf = np.linspace(0., Z_MAX*1.01, n)
+    return zf, _e_const_on_grid(alpha, zf)
+
+def bbn_geomean_const(alpha, n_T=80, z_ref=1e6):
+    """BBN geometric mean for constant alpha using the full model geometry at alpha.
+
+    E_ref at z_ref is obtained from _e_const_on_grid; extrapolated analytically
+    via E_BBN = E_ref * ((1+z_BBN)/(1+z_ref))^{1+2*alpha}, valid when g->0 (high-z).
+    """
+    z_eval = np.unique(np.concatenate([
+        np.linspace(0., 1., 400),
+        np.geomspace(1., z_ref * 1.02, 5000),
+    ]))
+    E_ref = float(np.interp(z_ref, z_eval, _e_const_on_grid(alpha, z_eval)))
+    T_arr = np.geomspace(_T_BBN_LO, _T_BBN_HI, n_T)
+    z_arr = T_arr * 1.e6 / _T0_EV - 1.
+    ln_r  = np.log((1. + z_arr) / (1. + z_ref))
+    E_BBN = E_ref * np.exp((1. + 2.*alpha) * ln_r)
+    ratio = _H0_SI * E_BBN / _H_std(T_arr)
+    return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
+
 def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
     """Geometric mean of H_perc(T)/H_std(T) over T=0.07-0.10 MeV.
 
@@ -191,6 +234,22 @@ def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
     E_BBN = E_ref * np.exp(ln_r + 2. * integral_alpha)
     ratio  = _H0_SI * E_BBN / _H_std(T_arr)
     return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
+
+# ── BBN likelihood ─────────────────────────────────────────────────────────────
+# σ_H/H from primordial Y_p: Aver, Olive & Skillman 2021 (arXiv:2010.04180),
+# Yp=0.2453±0.0034, dYp/dNeff≈0.013 → σ(Neff)≈0.26 → σH/H=σ(Neff)/(2×3.046)≈4%.
+# Consistent with Fields, Olive, Yeh & Young 2020 (arXiv:1912.01132, JCAP 03,010):
+# Nν=2.86±0.15 from BBN alone → σH/H≈2.5% (tighter, includes CMB priors).
+SIGMA_H_BBN = 0.04   # 4% (1σ), conservative: Y_p alone, no CMB N_eff prior
+
+def chi2_bbn(gm_val, sigma_H=SIGMA_H_BBN):
+    """χ²_BBN = ((gm−1)/σ_H)²: one effective BBN data point.
+
+    gm_val is the geometric mean of H_model(T)/H_std(T) over T=0.07-0.10 MeV.
+    σ_H=0.04 from Aver et al. 2021 (arXiv:2010.04180).
+    ΛCDM satisfies BBN exactly (gm=1), so χ²_BBN(ΛCDM)=0.
+    """
+    return float((gm_val - 1.) ** 2 / sigma_H ** 2)
 
 # Find optimal n for BAO-only and joint
 res_n_bao = minimize_scalar(
@@ -236,11 +295,13 @@ print(f"SAT-2 (n=0.5 fix) BBN-constrained:  ah={ah_bbn_opt:.4f}, gm={gm_ah_bbn:.
 MODEL = "Hyperconical a-run"
 MODEL2 = "Hyp a-run SAT-2"
 
-def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1):
+def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1, c2_bbn=0.0):
     """k_model: free params of the model being compared (1 for hyperconical).
        k_lcdm:  free params of the ΛCDM reference (1 for non-BBN rows, 2 for BBN rows).
-       ΔAIC_tot = Δχ²_tot + 2*(k_model - k_lcdm); ΔAIC_BAO/SN are pure Δχ² components."""
-    c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef); c2j = c2b + c2s
+       c2_bbn:  χ²_BBN = ((gm-1)/σ_H)² with σ_H=SIGMA_H_BBN (0 for non-BBN rows).
+       ΔAIC_tot = Δ(χ²_BAO+χ²_SN+χ²_BBN) + 2*(k_model - k_lcdm);
+       Δχ²_BAO and Δχ²_SN are pure per-dataset differences (no parameter penalty)."""
+    c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef); c2j = c2b + c2s + c2_bbn
     nb = c2b / DOF_BAO; ns = c2s / DOF_SN
     db = c2b - c2b_jnt; ds = c2s - c2s_jnt
     dj = (c2j - c2j_lcdm) + 2*(k_model - k_lcdm)
@@ -248,8 +309,10 @@ def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1):
           f"{bbn_norm:>10}  {db:>+8.2f} {ds:>+8.2f} {dj:>+8.2f}")
 
 print(f"\n{'Constraint':<14} {'Model':<22} {'Param':<12} {'χ²ν_BAO':>8} {'χ²ν_SN':>8} "
-      f"{'BBN_norm':>10}  {'ΔAIC_BAO':>8} {'ΔAIC_SN':>8} {'ΔAIC_tot':>8}")
-print(f"  1-par ΛCDM ref: Ω_m={res_jnt.x:.4f} (joint BAO+SN)  |  2-par ΛCDM ref: same Ω_m, k=2 (BBN trivially satisfied)")
+      f"{'BBN_norm':>10}  {'Δχ²_BAO':>8} {'Δχ²_SN':>8} {'ΔAIC_tot':>8}")
+print(f"  Note: ΔAIC_tot = Δχ²_BAO + Δχ²_SN + 2(k_model − k_ΛCDM)  "
+      f"[standard rows k_model=k_ΛCDM=1 → Δk=0; BBN/0-par rows: Δk=−1]")
+print(f"  1-par ΛCDM ref: Ω_m={res_jnt.x:.4f} (joint BAO+SN)  |  2-par ΛCDM ref: same Ω_m, k=2")
 print("-"*110)
 
 zf, Ef = E_hippopede(sat(n_bao_opt))
@@ -259,10 +322,12 @@ zf, Ef = E_hippopede(sat(n_joint_opt))
 row4("BAO+SN",     MODEL, f"n={n_joint_opt:.3f}", zf, Ef, f"~{gm_joint:.1f}", k_lcdm=1)
 
 zf, Ef = E_hippopede(sat(n_bbn_opt))
-row4("BAO+BBN",    MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2)
+row4("BAO+BBN",    MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2,
+     c2_bbn=chi2_bbn(gm_bbn_opt))
 
 zf, Ef = E_hippopede(sat(n_bbn_opt))
-row4("BAO+SN+BBN", MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2)
+row4("BAO+SN+BBN", MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2,
+     c2_bbn=chi2_bbn(gm_bbn_opt))
 
 zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
 print("-"*110)
@@ -270,6 +335,19 @@ row4("BAO+SN",     "ΛCDM (1-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcd
 # 2-par LCDM reference: k_model=k_lcdm=2 so DAIC=0 (self-reference for BBN group)
 # Omega_r is calibrated by BBN (not fitted to BAO/SN); chi2 values same as 1-par (Omega_r negligible at DESI z)
 row4("BAO+SN+BBN", "ΛCDM (2-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcdm, "1", k_model=2, k_lcdm=2)
+print("-"*110)
+print("  Hyperconical constant-α (no running) — baseline; contrasts with running extension below")
+res_alpha_const = minimize_scalar(
+    lambda a: chi2_joint(*E_hippopede_const(a)), bounds=(0.20, 0.50), method="bounded")
+alpha_const_opt = res_alpha_const.x
+gm_const_opt  = bbn_geomean_const(alpha_const_opt)
+gm_const_half = bbn_geomean_const(0.500)
+print(f"  Const-α BAO+SN-optimal: α={alpha_const_opt:.4f}, gm={gm_const_opt:.2f}")
+print(f"  Const-α α=1/2 (BBN-preferred limit): gm={gm_const_half:.4f}")
+zfc_opt,  Efc_opt  = E_hippopede_const(alpha_const_opt)
+zfc_half, Efc_half = E_hippopede_const(0.500)
+row4("BAO+SN", "Hyp const-α",   f"α={alpha_const_opt:.3f}", zfc_opt,  Efc_opt,  f"~{gm_const_opt:.1f}",  k_lcdm=1)
+row4("BAO+SN", "Hyp const-α",   "α=1/2 (fix)",              zfc_half, Efc_half, f"~{gm_const_half:.1f}", k_lcdm=1)
 print("-"*110)
 print("  SAT-2 (n=1/2 fix, alpha_h free) — exploratory parametrisation for alpha+gamma_U running")
 # 0-par: n=0.5 AND alpha_high=0.5 both fixed (theoretical prediction, k=0 vs LCDM k=1)
@@ -279,4 +357,5 @@ row4("BAO+SN",     MODEL2+" (0-par)", "ah=1/2 (fix)", zf0, Ef0, f"~{gm0:.1f}", k
 zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bao_opt))
 row4("BAO+SN",     MODEL2, f"ah={ah_bao_opt:.4f}", zf, Ef, f"~{gm_ah_bao:.2f}", k_lcdm=1)
 zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
-row4("BAO+SN+BBN", MODEL2, f"ah={ah_bbn_opt:.4f}", zf, Ef, f"{gm_ah_bbn:.4f}", k_lcdm=2)
+row4("BAO+SN+BBN", MODEL2, f"ah={ah_bbn_opt:.4f}", zf, Ef, f"{gm_ah_bbn:.4f}", k_lcdm=2,
+     c2_bbn=chi2_bbn(gm_ah_bbn))
