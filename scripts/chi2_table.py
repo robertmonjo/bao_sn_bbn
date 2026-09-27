@@ -1,6 +1,11 @@
 """
-Joint chi² table: BAO+SN, BAO+BBN, BAO+BBN+SN, ΛCDM
-ΔAIC_joint = chi2_joint_model - chi2_joint_ΛCDM (shared Ω_m)
+Joint chi² table: BAO+SN and BAO+SN+BBN — Table 1 reproduction.
+
+Columns (12):
+  Constraint | Model | n | Parameters | H_norm | Y_p | D/H(×10⁻⁵) |
+  χ²ν_BAO | χ²ν_SN | Δχ²_BAO | Δχ²_SN | ΔAIC_tot
+
+ΔAIC_tot = Δ(χ²_BAO + χ²_SN + χ²_BBN) + 2·(k_model − k_ΛCDM)
 """
 from __future__ import annotations
 import csv, sys
@@ -12,11 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(ROOT))
+
 from hyperconical_model import ExtendedProjectedHyperconical
+from bbn_hyperconical import compute_abundances, ETA_STD
 
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
-N_SAT_FIX = 0.5   # exploratory fixed exponent for SAT-2 parametrisation
+N_SAT_FIX = 0.5    # fixed SAT exponent for the 1-par running-alpha parametrisation
+ETA_FIT   = 7.61e-10  # baryon-to-photon ratio for 2-par model Y_p/D/H
 
 # ── BBN physical constants ─────────────────────────────────────────────────────
 _T0_EV      = 2.7255 * 8.617333262e-5         # CMB temperature in eV
@@ -75,6 +84,7 @@ def E_lcdm(om, n=5000):
     return zf, np.sqrt(om*(1+zf)**3 + (1-om))
 
 def E_hippopede(alpha_z_func, n=5000):
+    """E(z) grid for running-alpha model using ALPHA_LOW for the geometry."""
     model = ExtendedProjectedHyperconical(alpha=ALPHA_LOW)
     zf = np.linspace(0, Z_MAX*1.01, n)
     az = alpha_z_func(zf)
@@ -90,11 +100,27 @@ def E_hippopede(alpha_z_func, n=5000):
     E /= float(np.interp(0.0, zf, E))
     return zf, E
 
-def E_hippopede_const(alpha, n=3000):
-    model = ExtendedProjectedHyperconical(alpha=alpha)
+def E_hippopede_al(alpha_z_func, al=ALPHA_LOW, n=5000):
+    """E(z) grid for running-alpha model using al for the geometry (not global ALPHA_LOW)."""
+    model = ExtendedProjectedHyperconical(alpha=al)
     zf = np.linspace(0, Z_MAX*1.01, n)
-    Ef, _ = model.e_and_q(zf)
-    return zf, Ef
+    az = alpha_z_func(zf)
+    x = model.x_from_lz(np.log1p(zf))
+    u = np.sqrt(np.maximum(1.0/model.k - x**2, 1e-14))
+    y = np.arctan2(x, u)
+    g = np.maximum(1.0 - y/model.y0, 1e-12)
+    t = (y/2.0)/(g**az)
+    rhat = 2.0*np.arctan(t)
+    dr = np.gradient(rhat, zf)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        E = 1.0/dr
+    E /= float(np.interp(0.0, zf, E))
+    return zf, E
+
+def E_hippopede_const(alpha, n=3000):
+    """E(z) grid for constant-alpha hyperconical model."""
+    zf = np.linspace(0., Z_MAX*1.01, n)
+    return zf, _e_const_on_grid(alpha, zf)
 
 # ── chi² functions ───────────────────────────────────────────────────────────
 
@@ -129,31 +155,30 @@ res_jnt = minimize_scalar(lambda om: chi2_joint(*E_lcdm(om)),bounds=(0.1,0.6),me
 c2b_lcdm = chi2_bao(*E_lcdm(res_bao.x))
 c2s_lcdm = chi2_sn(*E_lcdm(res_sn.x))
 c2j_lcdm = chi2_joint(*E_lcdm(res_jnt.x))
-# consistent reference: BAO and SN chi2 at the joint-optimal Omega_m
+# Consistent reference: BAO and SN chi2 at the joint-optimal Omega_m
 c2b_jnt = chi2_bao(*E_lcdm(res_jnt.x))
 c2s_jnt = chi2_sn(*E_lcdm(res_jnt.x))
 
-print(f"ΛCDM BAO: Ω_m={res_bao.x:.4f}, χ²_ν={c2b_lcdm/DOF_BAO:.4f}")
-print(f"ΛCDM SN:  Ω_m={res_sn.x:.4f},  χ²_ν={c2s_lcdm/DOF_SN:.4f}")
-print(f"ΛCDM joint: Ω_m={res_jnt.x:.4f}, χ²_joint={c2j_lcdm:.4f}")
-
 # ── ansatz functions ──────────────────────────────────────────────────────────
 
-def sat(n, ah=ALPHA_HIGH):   return lambda z: ah - (ah-ALPHA_LOW)*(1+z)**(-n)
+def sat(n, ah=ALPHA_HIGH, al=ALPHA_LOW):
+    """Saturating running alpha: alpha(z) = ah - (ah-al)*(1+z)^{-n}."""
+    return lambda z: ah - (ah-al)*(1+z)**(-n)
+
 def pade(al,zc): return lambda z: al + (ALPHA_HIGH-al)*z/(z+zc)
 
-def _e_sat_on_grid(n, z_eval, ah=ALPHA_HIGH):
+def _e_sat_on_grid(n, z_eval, ah=ALPHA_HIGH, al=ALPHA_LOW):
     """E(z)/E(0) for SAT running-alpha on a provided z_eval grid (must start at 0).
 
     Numerically stable only for z_eval well below z_BBN~3e8; beyond ~1e7 the
-    rhat→pi saturation kills the gradient.  Use bbn_geomean for BBN extrapolation.
+    rhat->pi saturation kills the gradient.  Use bbn_geomean for BBN extrapolation.
     """
     z = np.asarray(z_eval, float)
-    model = ExtendedProjectedHyperconical(alpha=ALPHA_LOW)
+    model = ExtendedProjectedHyperconical(alpha=al)
     x   = model.x_from_lz(np.log1p(z))
     u   = np.sqrt(np.maximum(1./model.k - x**2, 1e-14))
     y   = np.arctan2(x, u)
-    az  = sat(n, ah)(z)
+    az  = sat(n, ah, al)(z)
     g   = np.maximum(1. - y/model.y0, 1e-12)
     t   = (y/2.) / (g**az)
     rhat = 2.*np.arctan(t)
@@ -182,11 +207,6 @@ def _e_const_on_grid(alpha, z_eval):
     h   = 1./dr
     return h / h[0]
 
-def E_hippopede_const(alpha, n=3000):
-    """E(z) grid for constant-alpha hyperconical model."""
-    zf = np.linspace(0., Z_MAX*1.01, n)
-    return zf, _e_const_on_grid(alpha, zf)
-
 def bbn_geomean_const(alpha, n_T=80, z_ref=1e6):
     """BBN geometric mean for constant alpha using the full model geometry at alpha.
 
@@ -205,7 +225,7 @@ def bbn_geomean_const(alpha, n_T=80, z_ref=1e6):
     ratio = _H0_SI * E_BBN / _H_std(T_arr)
     return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
 
-def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
+def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6, al=ALPHA_LOW):
     """Geometric mean of H_perc(T)/H_std(T) over T=0.07-0.10 MeV.
 
     Analytical extrapolation: integrates nu(z) = 1 + 2*alpha(z) from z_ref to
@@ -213,8 +233,8 @@ def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
     This is more accurate than the power-law fit (which uses a transient nu from
     the fit range z=10^3-10^6, where alpha is still running, overestimating E).
 
-    For SAT running alpha = alpha_high - (alpha_high-alpha_low)*(1+z)^{-n}:
-      integral_{z_ref}^{z} alpha dlnz = alpha_h*ln(r) + (alpha_h-alpha_l)/n *
+    For SAT running alpha = ah - (ah-al)*(1+z)^{-n}:
+      integral_{z_ref}^{z} alpha dlnz = ah*ln(r) + (ah-al)/n *
                                          ((1+z)^{-n} - (1+z_ref)^{-n})
       log(E(z)/E(z_ref)) = ln(r) + 2 * integral
     """
@@ -222,18 +242,42 @@ def bbn_geomean(n, ah=ALPHA_HIGH, n_T=80, z_ref=1e6):
         np.linspace(0., 1., 400),
         np.geomspace(1., z_ref * 1.02, 5000),
     ]))
-    e_run = _e_sat_on_grid(n, z_eval, ah)
+    e_run = _e_sat_on_grid(n, z_eval, ah, al)
     E_ref = float(np.interp(z_ref, z_eval, e_run))
 
     # Extrapolate to BBN temperatures (z~3e8)
     T_arr = np.geomspace(_T_BBN_LO, _T_BBN_HI, n_T)
     z_arr = T_arr * 1.e6 / _T0_EV - 1.
     ln_r = np.log((1. + z_arr) / (1. + z_ref))
-    integral_alpha = ah * ln_r + (ah - ALPHA_LOW) / n * (
+    integral_alpha = ah * ln_r + (ah - al) / n * (
         (1. + z_arr)**(-n) - (1. + z_ref)**(-n))
     E_BBN = E_ref * np.exp(ln_r + 2. * integral_alpha)
     ratio  = _H0_SI * E_BBN / _H_std(T_arr)
     return float(np.exp(np.mean(np.log(np.maximum(ratio, 1e-30)))))
+
+def bbn_ratio_func(n, ah, al=ALPHA_LOW, z_ref=1e6):
+    """Return callable T_mev -> H_model(T)/H_std(T) using the SAT analytical extrapolation.
+
+    Uses the same high-z extrapolation as bbn_geomean, but returns a pointwise
+    ratio function suitable for passing to compute_abundances.
+    """
+    z_eval = np.unique(np.concatenate([
+        np.linspace(0., 1., 400),
+        np.geomspace(1., z_ref * 1.02, 5000),
+    ]))
+    e_run = _e_sat_on_grid(n, z_eval, ah, al)
+    E_ref = float(np.interp(z_ref, z_eval, e_run))
+
+    def ratio(T_mev):
+        T_scalar = float(np.asarray(T_mev))
+        z_T = T_scalar * 1.e6 / _T0_EV - 1.
+        ln_r = np.log((1. + z_T) / (1. + z_ref))
+        integral_alpha = ah * ln_r + (ah - al) / n * (
+            (1. + z_T)**(-n) - (1. + z_ref)**(-n))
+        E_T = E_ref * np.exp(ln_r + 2. * integral_alpha)
+        return float(_H0_SI * E_T / _H_std(T_scalar))
+
+    return ratio
 
 # ── BBN likelihood ─────────────────────────────────────────────────────────────
 # σ_H/H from primordial Y_p: Aver, Olive & Skillman 2021 (arXiv:2010.04180),
@@ -251,111 +295,151 @@ def chi2_bbn(gm_val, sigma_H=SIGMA_H_BBN):
     """
     return float((gm_val - 1.) ** 2 / sigma_H ** 2)
 
-# Find optimal n for BAO-only and joint
-res_n_bao = minimize_scalar(
-    lambda n: chi2_bao(*E_hippopede(sat(n))), bounds=(0.05, 0.8), method="bounded")
-n_bao_opt = res_n_bao.x
-res_n_joint = minimize_scalar(
-    lambda n: chi2_joint(*E_hippopede(sat(n))), bounds=(0.05, 0.8), method="bounded")
-n_joint_opt = res_n_joint.x
-print(f"\nSat BAO-optimal  n={n_bao_opt:.4f}, chi2_BAO={chi2_bao(*E_hippopede(sat(n_bao_opt))):.4f}")
-print(f"Sat joint-optimal n={n_joint_opt:.4f}, chi2_joint={res_n_joint.fun:.4f}")
-
-print("Computing BBN normalisations (z~3e8) ...")
-gm_bao   = bbn_geomean(n_bao_opt)
-gm_joint = bbn_geomean(n_joint_opt)
-print(f"  n_bao={n_bao_opt:.4f} -> gm={gm_bao:.4f};  n_joint={n_joint_opt:.4f} -> gm={gm_joint:.4f}")
-
-# Find n_bbn_opt: the unique n in (0.04, 0.12) where gm_bbn = 1.
-# gm(0.04)<1<gm(0.12) from the sweep; use bisection on log(gm).
-n_bbn_opt    = brentq(lambda n: np.log(bbn_geomean(n)), 0.04, 0.12, xtol=1e-4)
-gm_bbn_opt   = bbn_geomean(n_bbn_opt)
-print(f"  n_bbn_opt={n_bbn_opt:.4f} (gm={gm_bbn_opt:.4f})")
-
-# ── SAT-2: n=0.5 fixed, alpha_high free ──────────────────────────────────────
-# Exploratory parametrisation: SAT exponent n=1/2 interpolates alpha(z) as
-# alpha(z) = ah - (ah-al)/sqrt(1+z).  Motivation: empirical fit to BAO+SN+BBN;
-# connection to gamma_U-running under investigation.
+# ── Optimise BAO+SN running-alpha (1-par, N_SAT_FIX exponent, ah free) ────────
 
 res_ah_bao = minimize_scalar(
     lambda ah: chi2_joint(*E_hippopede(sat(N_SAT_FIX, ah))),
     bounds=(0.30, 0.65), method="bounded")
 ah_bao_opt = res_ah_bao.x
 gm_ah_bao  = bbn_geomean(N_SAT_FIX, ah_bao_opt)
-print(f"\nSAT-2 (n=0.5 fix) BAO+SN-optimal: ah={ah_bao_opt:.4f}, gm={gm_ah_bao:.3f}")
 
-# BBN-constrained alpha_high for n=0.5 (gm=1)
+# BBN-constrained alpha_high for N_SAT_FIX exponent (gm=1)
 ah_bbn_lo, ah_bbn_hi = 0.30, 0.55
-gm_lo = bbn_geomean(N_SAT_FIX, ah_bbn_lo); gm_hi = bbn_geomean(N_SAT_FIX, ah_bbn_hi)
 ah_bbn_opt = brentq(lambda ah: np.log(bbn_geomean(N_SAT_FIX, ah)),
                     ah_bbn_lo, ah_bbn_hi, xtol=1e-4)
 gm_ah_bbn  = bbn_geomean(N_SAT_FIX, ah_bbn_opt)
-print(f"SAT-2 (n=0.5 fix) BBN-constrained:  ah={ah_bbn_opt:.4f}, gm={gm_ah_bbn:.4f}")
 
-MODEL = "Hyperconical a-run"
-MODEL2 = "Hyp a-run SAT-2"
+# ── Constant-alpha BAO+SN-optimal ─────────────────────────────────────────────
 
-def row4(constraint, model, param, zf, Ef, bbn_norm, k_model=1, k_lcdm=1, c2_bbn=0.0):
-    """k_model: free params of the model being compared (1 for hyperconical).
-       k_lcdm:  free params of the ΛCDM reference (1 for non-BBN rows, 2 for BBN rows).
-       c2_bbn:  χ²_BBN = ((gm-1)/σ_H)² with σ_H=SIGMA_H_BBN (0 for non-BBN rows).
-       ΔAIC_tot = Δ(χ²_BAO+χ²_SN+χ²_BBN) + 2*(k_model - k_lcdm);
-       Δχ²_BAO and Δχ²_SN are pure per-dataset differences (no parameter penalty)."""
-    c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef); c2j = c2b + c2s + c2_bbn
-    nb = c2b / DOF_BAO; ns = c2s / DOF_SN
-    db = c2b - c2b_jnt; ds = c2s - c2s_jnt
-    dj = (c2j - c2j_lcdm) + 2*(k_model - k_lcdm)
-    print(f"{constraint:<14} {model:<22} {param:<12} {nb:>8.3f} {ns:>8.3f} "
-          f"{bbn_norm:>10}  {db:>+8.2f} {ds:>+8.2f} {dj:>+8.2f}")
-
-print(f"\n{'Constraint':<14} {'Model':<22} {'Param':<12} {'χ²ν_BAO':>8} {'χ²ν_SN':>8} "
-      f"{'BBN_norm':>10}  {'Δχ²_BAO':>8} {'Δχ²_SN':>8} {'ΔAIC_tot':>8}")
-print(f"  Note: ΔAIC_tot = Δχ²_BAO + Δχ²_SN + 2(k_model − k_ΛCDM)  "
-      f"[standard rows k_model=k_ΛCDM=1 → Δk=0; BBN/0-par rows: Δk=−1]")
-print(f"  1-par ΛCDM ref: Ω_m={res_jnt.x:.4f} (joint BAO+SN)  |  2-par ΛCDM ref: same Ω_m, k=2")
-print("-"*110)
-
-zf, Ef = E_hippopede(sat(n_bao_opt))
-row4("BAO",        MODEL, f"n={n_bao_opt:.3f}", zf, Ef, f"~{gm_bao:.1f}", k_lcdm=1)
-
-zf, Ef = E_hippopede(sat(n_joint_opt))
-row4("BAO+SN",     MODEL, f"n={n_joint_opt:.3f}", zf, Ef, f"~{gm_joint:.1f}", k_lcdm=1)
-
-zf, Ef = E_hippopede(sat(n_bbn_opt))
-row4("BAO+BBN",    MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2,
-     c2_bbn=chi2_bbn(gm_bbn_opt))
-
-zf, Ef = E_hippopede(sat(n_bbn_opt))
-row4("BAO+SN+BBN", MODEL, f"n={n_bbn_opt:.3f}", zf, Ef, f"{gm_bbn_opt:.3f}", k_lcdm=2,
-     c2_bbn=chi2_bbn(gm_bbn_opt))
-
-zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
-print("-"*110)
-row4("BAO+SN",     "ΛCDM (1-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcdm, "1", k_model=1, k_lcdm=1)
-# 2-par LCDM reference: k_model=k_lcdm=2 so DAIC=0 (self-reference for BBN group)
-# Omega_r is calibrated by BBN (not fitted to BAO/SN); chi2 values same as 1-par (Omega_r negligible at DESI z)
-row4("BAO+SN+BBN", "ΛCDM (2-par ref)", f"Ω_m={res_jnt.x:.3f}", zf_lcdm, Ef_lcdm, "1", k_model=2, k_lcdm=2)
-print("-"*110)
-print("  Hyperconical constant-α (no running) — baseline; contrasts with running extension below")
 res_alpha_const = minimize_scalar(
     lambda a: chi2_joint(*E_hippopede_const(a)), bounds=(0.20, 0.50), method="bounded")
 alpha_const_opt = res_alpha_const.x
 gm_const_opt  = bbn_geomean_const(alpha_const_opt)
 gm_const_half = bbn_geomean_const(0.500)
-print(f"  Const-α BAO+SN-optimal: α={alpha_const_opt:.4f}, gm={gm_const_opt:.2f}")
-print(f"  Const-α α=1/2 (BBN-preferred limit): gm={gm_const_half:.4f}")
-zfc_opt,  Efc_opt  = E_hippopede_const(alpha_const_opt)
-zfc_half, Efc_half = E_hippopede_const(0.500)
-row4("BAO+SN", "Hyp const-α",   f"α={alpha_const_opt:.3f}", zfc_opt,  Efc_opt,  f"~{gm_const_opt:.1f}",  k_lcdm=1)
-row4("BAO+SN", "Hyp const-α",   "α=1/2 (fix)",              zfc_half, Efc_half, f"~{gm_const_half:.1f}", k_lcdm=1)
-print("-"*110)
-print("  SAT-2 (n=1/2 fix, alpha_h free) — exploratory parametrisation for alpha+gamma_U running")
-# 0-par: n=0.5 AND alpha_high=0.5 both fixed (theoretical prediction, k=0 vs LCDM k=1)
+
+# ── 2-par model: al and ah both fixed (al_2par, ah_2par) ─────────────────────
+
+al_2par, ah_2par = 0.255, 0.4364
+zf_2par, Ef_2par = E_hippopede_al(sat(N_SAT_FIX, ah_2par, al_2par), al=al_2par)
+gm_2par = bbn_geomean(N_SAT_FIX, ah_2par, al=al_2par)
+rf_2par = bbn_ratio_func(N_SAT_FIX, ah_2par, al=al_2par)
+abund_2par = compute_abundances(rf_2par, eta=ETA_FIT)
+
+# ── Y_p / D/H for BAO+SN running-alpha rows (0-par and 1-par, at ETA_STD) ────
+
+# 0-par: ah=1/2, N_SAT_FIX exponent
+rf_0par = bbn_ratio_func(N_SAT_FIX, 0.500)
+abund_0par = compute_abundances(rf_0par, eta=ETA_STD)
+
+# 1-par BAO+SN-optimal
+rf_1par_bao = bbn_ratio_func(N_SAT_FIX, ah_bao_opt)
+abund_1par_bao = compute_abundances(rf_1par_bao, eta=ETA_STD)
+
+# 1-par BBN-constrained
+rf_1par_bbn = bbn_ratio_func(N_SAT_FIX, ah_bbn_opt)
+abund_1par_bbn = compute_abundances(rf_1par_bbn, eta=ETA_STD)
+
+# SBBN reference (ratio=1) for ΛCDM BBN row
+abund_sbbn = compute_abundances(lambda T: 1.0, eta=ETA_STD)
+
+MODEL  = "Hyp a-run"
+
+# ── Table-1 output ────────────────────────────────────────────────────────────
+
+def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
+           yp="---", dh="---", k_model=1, k_lcdm=1, c2_bbn=0.0):
+    """Print one Table 1 row (12 columns).
+
+    bbn_norm : string shown in H_norm column (geometric mean H_model/H_std at BBN)
+    yp       : Y_p value (float) or "---"
+    dh       : D/H × 10^5 (float) or "---"
+    k_model  : free parameters in the model (for ΔAIC)
+    k_lcdm   : free parameters in the ΛCDM reference (for ΔAIC)
+    c2_bbn   : χ²_BBN contribution (0 for BAO+SN-only rows)
+    """
+    c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef)
+    c2j = c2b + c2s + c2_bbn
+    nb = c2b / DOF_BAO; ns = c2s / DOF_SN
+    db = c2b - c2b_jnt; ds = c2s - c2s_jnt
+    dj = (c2j - c2j_lcdm) + 2*(k_model - k_lcdm)
+    yp_s = f"{yp:.2f}" if isinstance(yp, float) else str(yp)
+    dh_s = f"{dh:.1f}" if isinstance(dh, float) else str(dh)
+    print(f"{constraint:<14} {model:<18} {n_free:>2}  {param:<24} "
+          f"{bbn_norm:>7}  {yp_s:>5}  {dh_s:>5}  "
+          f"{nb:>7.3f}  {ns:>7.3f}  {db:>+7.2f}  {ds:>+7.2f}  {dj:>+7.2f}")
+
+hdr = (f"{'Constraint':<14} {'Model':<18}  n  {'Parameters':<24} "
+       f"{'H_norm':>7}  {'Y_p':>5}  {'D/H':>5}  "
+       f"{'χ²ν_BAO':>7}  {'χ²ν_SN':>7}  {'Δχ²_BAO':>7}  {'Δχ²_SN':>7}  {'ΔAIC':>7}")
+sep = "-" * len(hdr)
+print(hdr)
+print(f"  (D/H in units of 1e-5; H_norm = geometric mean H_model/H_std at T=0.07–0.10 MeV)")
+print(f"  ΛCDM ref (BAO+SN): Ω_m={res_jnt.x:.4f}  |  ΛCDM ref (BBN): same Ω_m, k=2")
+print(sep)
+
+# ── BAO+SN block ──────────────────────────────────────────────────────────────
+print("BAO+SN block:")
+
+# Hyp. const-α (BAO+SN-optimal, k=1 vs ΛCDM k=1)
+zfc_opt, Efc_opt = E_hippopede_const(alpha_const_opt)
+row_t1("BAO+SN", "Hyp const-α", 1,
+        f"α={alpha_const_opt:.3f}",
+        zfc_opt, Efc_opt, f"~{gm_const_opt:.2f}",
+        yp="---", dh="---", k_model=1, k_lcdm=1)
+
+# Hyp. a-run, 0-par (ah=1/2, N_SAT_FIX exponent both fixed; k=0 vs ΛCDM k=1)
 zf0, Ef0 = E_hippopede(sat(N_SAT_FIX, 0.500))
-gm0 = bbn_geomean(N_SAT_FIX, 0.500)
-row4("BAO+SN",     MODEL2+" (0-par)", "ah=1/2 (fix)", zf0, Ef0, f"~{gm0:.1f}", k_model=0, k_lcdm=1)
-zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bao_opt))
-row4("BAO+SN",     MODEL2, f"ah={ah_bao_opt:.4f}", zf, Ef, f"~{gm_ah_bao:.2f}", k_lcdm=1)
-zf, Ef = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
-row4("BAO+SN+BBN", MODEL2, f"ah={ah_bbn_opt:.4f}", zf, Ef, f"{gm_ah_bbn:.4f}", k_lcdm=2,
-     c2_bbn=chi2_bbn(gm_ah_bbn))
+row_t1("BAO+SN", MODEL, 0,
+        "ah=1/2 (fix)",
+        zf0, Ef0, f"~{bbn_geomean(N_SAT_FIX, 0.500):.1f}",
+        yp=float(abund_0par["Y_p"]),
+        dh=float(abund_0par["D_H"]*1e5),
+        k_model=0, k_lcdm=1)
+
+# Hyp. a-run, 1-par (ah free, joint BAO+SN optimal; k=1 vs ΛCDM k=1)
+zf1, Ef1 = E_hippopede(sat(N_SAT_FIX, ah_bao_opt))
+row_t1("BAO+SN", MODEL, 1,
+        f"ah={ah_bao_opt:.3f}",
+        zf1, Ef1, f"~{gm_ah_bao:.2f}",
+        yp=float(abund_1par_bao["Y_p"]),
+        dh=float(abund_1par_bao["D_H"]*1e5),
+        k_model=1, k_lcdm=1)
+
+# ΛCDM reference (k=1)
+zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
+row_t1("BAO+SN", "ΛCDM (ref)", 1,
+        f"Ω_m={res_jnt.x:.3f}",
+        zf_lcdm, Ef_lcdm, "---",
+        yp="---", dh="---", k_model=1, k_lcdm=1)
+
+print(sep)
+print("BAO+SN+BBN block:")
+
+# Hyp. a-run, 1-par BBN-constrained (ah free, gm=1; k=1 vs ΛCDM k=2)
+zfb, Efb = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
+row_t1("BAO+SN+BBN", MODEL, 1,
+        f"ah={ah_bbn_opt:.4f}",
+        zfb, Efb, f"{gm_ah_bbn:.3f}",
+        yp=float(abund_1par_bbn["Y_p"]),
+        dh=float(abund_1par_bbn["D_H"]*1e5),
+        k_model=1, k_lcdm=2,
+        c2_bbn=chi2_bbn(gm_ah_bbn))
+
+# Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2, no BBN chi2 term)
+row_t1("BAO+SN+BBN", MODEL, 3,
+        f"al={al_2par}, ah={ah_2par}",
+        zf_2par, Ef_2par, f"~{gm_2par:.2f}",
+        yp=float(abund_2par["Y_p"]),
+        dh=float(abund_2par["D_H"]*1e5),
+        k_model=3, k_lcdm=2,
+        c2_bbn=0.0)
+
+# ΛCDM reference (k=2: Ω_m + Ω_r; chi2 same as 1-par since Ω_r negligible at DESI z)
+row_t1("BAO+SN+BBN", "ΛCDM (ref)", 2,
+        f"Ω_m={res_jnt.x:.3f}",
+        zf_lcdm, Ef_lcdm, "1",
+        yp=float(abund_sbbn["Y_p"]),
+        dh=float(abund_sbbn["D_H"]*1e5),
+        k_model=2, k_lcdm=2)
+
+print(sep)
