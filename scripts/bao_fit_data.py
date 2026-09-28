@@ -41,6 +41,9 @@ ALPHA_LOW  = 0.283
 ALPHA_HIGH = 0.4224   # BBN-constrained alpha_high (sqrt interpolation, gm=1.000)
 N_SQRT     = 0.5      # fixed exponent: (1+z)^{-0.5} = 1/sqrt(1+z)
 OMEGA_M_LCDM_JNT = 0.339   # LCDM joint BAO+SN optimal (used for all panels)
+# n=3 extension parameters (Table 1, BBN block, α_low+α_high+η free)
+AL_3PAR = 0.255
+AH_3PAR = 0.4364
 
 # ── load BAO data ────────────────────────────────────────────────────────────
 DATA_BAO = ROOT / "data" / "Ardra" / "desi_dr1_bao_galqso_lya_mean.csv"
@@ -71,10 +74,10 @@ sigma_all = np.sqrt(np.diag(cov_raw))   # 1-sigma from covariance diagonal
 Z_MAX = max(z_bao.max(), z_sn.max()) * 1.01
 
 # ── running-alpha E(z) ───────────────────────────────────────────────────────
-def E_running(n: float, z_arr: np.ndarray, ah: float = ALPHA_HIGH) -> np.ndarray:
+def E_running(n: float, z_arr: np.ndarray, ah: float = ALPHA_HIGH, al: float = ALPHA_LOW) -> np.ndarray:
     """E(z) for sqrt running-alpha model: alpha(z)=ah-(ah-al)/sqrt(1+z)."""
-    model = ExtendedProjectedHyperconical(alpha=ALPHA_LOW)
-    az = ah - (ah - ALPHA_LOW) * (1 + z_arr) ** (-n)
+    model = ExtendedProjectedHyperconical(alpha=al)
+    az = ah - (ah - al) * (1 + z_arr) ** (-n)
     x  = model.x_from_lz(np.log1p(z_arr))
     u  = np.sqrt(np.maximum(1.0 / model.k - x ** 2, 1e-14))
     y  = np.arctan2(x, u)
@@ -146,6 +149,14 @@ zf4 = np.linspace(0, z_curve.max() * 1.01, 4000)
 Ef4_hyp  = E_running(N_SQRT, zf4)
 Ef4_lcdm = E_lcdm(OMEGA_M_LCDM_JNT, zf4)
 
+# n=3 extension: alpha_low=0.255, alpha_high=0.4364; β from its own BAO fit
+zf_bao_3 = np.linspace(0, z_bao.max() * 1.01, 2000)
+Ef_hyp_bao_3  = E_running(N_SQRT, zf_bao_3, ah=AH_3PAR, al=AL_3PAR)
+mv_hyp_bao_3  = bao_model_vec(zf_bao_3, Ef_hyp_bao_3)
+beta_hyp_3    = beta_opt(mv_hyp_bao_3)
+Ec_hyp_3      = E_running(N_SQRT, z_curve, ah=AH_3PAR, al=AL_3PAR)
+Ef4_hyp_3     = E_running(N_SQRT, zf4,     ah=AH_3PAR, al=AL_3PAR)
+
 def dc_curve(zv, zf, Ef):
     m = zf <= zv
     return float(_trapz((1 / Ef)[m], zf[m])) if m.sum() >= 2 else 0.0
@@ -158,14 +169,22 @@ dm_lcdm = np.array([beta_lcdm_b * dc_curve(z, zf4, Ef4_lcdm) for z in z_curve])
 dh_lcdm = beta_lcdm_b / Ec_lcdm
 dv_lcdm = np.array([beta_lcdm_b * (z * dc_curve(z, zf4, Ef4_lcdm) ** 2 / Ec_lcdm[i]) ** (1/3) for i, z in enumerate(z_curve)])
 
+dm_hyp_3 = np.array([beta_hyp_3 * dc_curve(z, zf4, Ef4_hyp_3) for z in z_curve])
+dh_hyp_3 = beta_hyp_3 / Ec_hyp_3
+dv_hyp_3 = np.array([beta_hyp_3 * (z * dc_curve(z, zf4, Ef4_hyp_3) ** 2 / Ec_hyp_3[i]) ** (1/3) for i, z in enumerate(z_curve)])
+
 # SN curves
 z_sn_curve = np.linspace(0.01, z_sn.max() * 1.05, 300)
 zf_sn_fine = np.linspace(0, z_sn_curve.max() * 1.01, 3000)
 Ef_sn_hyp  = E_running(N_SQRT, zf_sn_fine)
 Ef_sn_lcdm = E_lcdm(OMEGA_M_LCDM_JNT, zf_sn_fine)
+Ef_sn_hyp_3 = E_running(N_SQRT, zf_sn_fine, ah=AH_3PAR, al=AL_3PAR)
 # Normalise by A_hyp: data → d_proxy/A, model curves → D_C (no free amplitude)
 dc_sn_hyp  = np.array([dc_curve(z, zf_sn_fine, Ef_sn_hyp)  for z in z_sn_curve])
 dc_sn_lcdm = (A_lcdm / A_hyp) * np.array([dc_curve(z, zf_sn_fine, Ef_sn_lcdm) for z in z_sn_curve])
+mv_sn_hyp_3 = sn_model_vec(zf_bao_3, Ef_hyp_bao_3)
+A_hyp_3     = A_opt(mv_sn_hyp_3)
+dc_sn_hyp_3 = (A_hyp_3 / A_hyp) * np.array([dc_curve(z, zf_sn_fine, Ef_sn_hyp_3) for z in z_sn_curve])
 
 # Lyα points (excluded from fit, shown grayed in figure)
 def _lya_pts(obs):
@@ -232,12 +251,13 @@ def _resid_panel(ax_res, z_pts, res_h, res_l, sig, xlabel):
 # ── BAO panels ────────────────────────────────────────────────────────────────
 COL_LYA = "0.62"   # gray for excluded Lyα points
 panel_cfg = [
-    (ax_dm, ax_dm_res, dm_hyp, dm_lcdm, dm_sel, dm_lya, r"$D_M/r_s$"),
-    (ax_dh, ax_dh_res, dh_hyp, dh_lcdm, dh_sel, dh_lya, r"$D_H/r_s$"),
-    (ax_dv, ax_dv_res, dv_hyp, dv_lcdm, dv_sel, dv_lya, r"$D_V/r_s$"),
+    (ax_dm, ax_dm_res, dm_hyp, dm_lcdm, dm_hyp_3, dm_sel, dm_lya, r"$D_M/r_s$"),
+    (ax_dh, ax_dh_res, dh_hyp, dh_lcdm, dh_hyp_3, dh_sel, dh_lya, r"$D_H/r_s$"),
+    (ax_dv, ax_dv_res, dv_hyp, dv_lcdm, dv_hyp_3, dv_sel, dv_lya, r"$D_V/r_s$"),
 ]
-for ax, ax_res, hyp_c, lc_c, sel, lya_pts, ylabel in panel_cfg:
+for ax, ax_res, hyp_c, lc_c, hyp3_c, sel, lya_pts, ylabel in panel_cfg:
     ax.plot(z_curve, hyp_c,  color=COL_HYP,  lw=1.8)
+    ax.plot(z_curve, hyp3_c, color=COL_HYP,  lw=0.9, ls=":")
     ax.plot(z_curve, lc_c,   color=COL_LCDM, lw=1.4, ls="--")
     ax.errorbar(z_bao[sel], d_bao[sel], yerr=sig_bao[sel], fmt="o", color=COL_BAO,
                 ms=5, elinewidth=1.2, capsize=3)
@@ -255,6 +275,7 @@ for ax, ax_res, hyp_c, lc_c, sel, lya_pts, ylabel in panel_cfg:
 
 # ── SN panel ──────────────────────────────────────────────────────────────────
 ax_sn.plot(z_sn_curve, dc_sn_hyp,  color=COL_HYP,  lw=1.8)
+ax_sn.plot(z_sn_curve, dc_sn_hyp_3, color=COL_HYP, lw=0.9, ls=":")
 ax_sn.plot(z_sn_curve, dc_sn_lcdm, color=COL_LCDM, lw=1.4, ls="--")
 ax_sn.errorbar(z_sn, d_sn / A_hyp, yerr=sig_sn, fmt="o", color=COL_SN,
                ms=3.5, elinewidth=0.8, alpha=0.7)
@@ -268,7 +289,9 @@ ax_sn_res.set_ylim(-5, 5)
 ax_legend.axis("off")
 legend_handles = [
     Line2D([0], [0], color=COL_HYP,  lw=1.8,
-           label=r"Hyp. $\alpha$-run ($\alpha_{\rm h}=0.422$)"),
+           label=r"Hyp. $\alpha$-run ($\alpha_{\rm h}=0.422$, $n=1$)"),
+    Line2D([0], [0], color=COL_HYP,  lw=0.9, ls=":",
+           label=r"Hyp. $\alpha$-run ($n=3$, $\alpha_{\rm l}=0.255$, $\alpha_{\rm h}=0.436$)"),
     Line2D([0], [0], color=COL_LCDM, lw=1.4, ls="--",
            label=rf"$\Lambda$CDM ($\Omega_m={OMEGA_M_LCDM_JNT}$)"),
     Line2D([0], [0], color=COL_BAO, marker="o", ms=5, lw=1.2,
