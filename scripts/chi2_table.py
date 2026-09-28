@@ -26,7 +26,6 @@ from bbn_hyperconical import compute_abundances, ETA_STD
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
 N_SAT_FIX = 0.5    # fixed SAT exponent for the 1-par running-alpha parametrisation
-ETA_FIT   = 7.637e-10  # baryon-to-photon ratio for 2-par model Y_p/D/H
 
 # ── ΛCDM radiation (fixed externally from FIRAS, Fixsen 2009, ApJ 707, 916) ──
 _TCMB_K      = 2.72548                         # T_CMB from FIRAS spectroscopy
@@ -497,7 +496,7 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
     """
     c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef)
     c2j = c2b + c2s + c2_bbn
-    nb = c2b / DOF_BAO; ns = c2s / DOF_SN
+    nb = c2b / (N_BAO - k_model); ns = c2s / (N_SN - k_model)
     db = c2b - c2b_jnt; ds = c2s - c2s_jnt
     dj = (c2j - c2j_lcdm - c2_bbn_ref) + 2*(k_model - k_lcdm)
     yp_s = str(yp)
