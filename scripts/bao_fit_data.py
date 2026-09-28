@@ -196,7 +196,7 @@ nu_bao, nu_sn = len(d_bao) - 1, len(z_sn) - 1
 
 # ── layout: (3+1) × (main + residual) ────────────────────────────────────────
 plt.rcParams.update({"font.size": 9})
-fig = plt.figure(figsize=(9.5, 8.5))
+fig = plt.figure(figsize=(9.5, 7.0))
 outer  = gridspec.GridSpec(2, 1, figure=fig, hspace=0.22)
 gs_bao = gridspec.GridSpecFromSubplotSpec(2, 3, subplot_spec=outer[0],
                                            height_ratios=[3, 1], hspace=0.07, wspace=0.30)
