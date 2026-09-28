@@ -11,7 +11,7 @@ from __future__ import annotations
 import csv, sys
 from pathlib import Path
 import numpy as np
-from scipy.optimize import minimize_scalar, brentq
+from scipy.optimize import minimize, minimize_scalar, brentq
 from scipy.interpolate import interp1d as _interp1d
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -350,15 +350,33 @@ alpha_const_opt = res_alpha_const.x
 gm_const_opt  = bbn_geomean_const(alpha_const_opt)
 gm_const_half = bbn_geomean_const(0.500)
 
-# ── 2-par model: al and ah both fixed (al_2par, ah_2par) ─────────────────────
+# ── 3-par joint fit: (al, ah, eta) minimises chi2_BAO+SN+Yp+DH ──────────────
 
-al_2par, ah_2par = 0.255, 0.4364
+DH_OBS = 2.527e-5; SIG_DH_OBS = 0.030e-5
+_YP_OBS = 0.2453; _SIG_YP = 0.0034
+
+def _chi2_3par(params):
+    al, ah, eta = params
+    if al < 0.05 or ah <= al + 0.01 or ah > 0.90 or eta < 3e-10 or eta > 15e-10:
+        return 1e10
+    try:
+        zf_, Ef_ = E_hippopede_al(sat(N_SAT_FIX, ah, al), al=al)
+        c2bs = chi2_bao(zf_, Ef_) + chi2_sn(zf_, Ef_)
+        rf_ = bbn_ratio_func(N_SAT_FIX, ah, al=al)
+        ab_ = compute_abundances(rf_, eta=eta)
+        c2_yp = ((ab_['Y_p'] - _YP_OBS) / _SIG_YP) ** 2
+        c2_dh = ((ab_['D_H'] - DH_OBS) / SIG_DH_OBS) ** 2
+        return c2bs + c2_yp + c2_dh
+    except Exception:
+        return 1e10
+
+_res_3par = minimize(_chi2_3par, [0.255, 0.4364, 7.658e-10],
+                     method='Nelder-Mead',
+                     options={'xatol': 1e-6, 'fatol': 1e-5, 'maxiter': 8000})
+al_2par, ah_2par, _eta_fit = _res_3par.x
 zf_2par, Ef_2par = E_hippopede_al(sat(N_SAT_FIX, ah_2par, al_2par), al=al_2par)
 gm_2par = bbn_geomean(N_SAT_FIX, ah_2par, al=al_2par)
 rf_2par = bbn_ratio_func(N_SAT_FIX, ah_2par, al=al_2par)
-# η fitted to D/H before computing abund_2par (Bloquer 3 fix)
-DH_OBS = 2.527e-5; SIG_DH_OBS = 0.030e-5
-_eta_fit = brentq(lambda e: compute_abundances(rf_2par, eta=e)['D_H'] - DH_OBS, 6e-10, 11e-10)
 abund_2par = compute_abundances(rf_2par, eta=_eta_fit)
 
 # ── Y_p / D/H for BAO+SN running-alpha rows (0-par and 1-par, at ETA_STD) ────
@@ -414,7 +432,6 @@ sig_al_2par = _profile_sig(
     al_2par, _c2_al2, 0.15, 0.42)
 
 # σ(ah_2par) from d(Y_p)/d(ah_2par) and σ_Yp=0.0034
-_SIG_YP = 0.0034
 _r2_lo = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par-_dah, al=al_2par), eta=_eta_fit)
 _r2_hi = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par+_dah, al=al_2par), eta=_eta_fit)
 _dYp_dah2 = (_r2_hi['Y_p'] - _r2_lo['Y_p']) / (2*_dah)
@@ -464,7 +481,6 @@ abund_lcdm_bbn = compute_abundances(lambda T: 1.0, eta=_eta_lcdm)
 
 # ── Y_p chi² for BBN block rows ───────────────────────────────────────────────
 # η is fitted to D/H (chi²_DH = 0 by construction); only Y_p residual enters.
-_YP_OBS = 0.2453
 _c2_yp_2par     = ((abund_2par['Y_p']    - _YP_OBS) / _SIG_YP)**2
 _c2_yp_lcdm_bbn = ((abund_lcdm_bbn['Y_p'] - _YP_OBS) / _SIG_YP)**2
 
