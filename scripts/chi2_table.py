@@ -35,7 +35,7 @@ OMEGA_R_LCDM = ORH2_FIX / H_FIX**2            # ≈ 8.53e-5; enters E_lcdm only
 
 # ── BBN physical constants ─────────────────────────────────────────────────────
 _T0_EV      = 2.7255 * 8.617333262e-5         # CMB temperature in eV
-_H0_SI      = 70.0 / 3.0856775814913673e19    # H0=70 km/s/Mpc in s^-1
+_H0_SI      = 68.0 / 3.0856775814913673e19    # H0=68 km/s/Mpc in s^-1 (hyperconical model prediction, Monjo 2024 ApJ)
 _MPL_GEV    = 1.220890e19                      # Planck mass in GeV
 _HBAR_GEV_S = 6.582119569e-25                 # ℏ in GeV·s
 _T_BBN_LO, _T_BBN_HI = 0.07, 0.10            # BBN window in MeV
