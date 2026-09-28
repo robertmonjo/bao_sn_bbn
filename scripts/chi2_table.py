@@ -28,6 +28,12 @@ ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
 N_SAT_FIX = 0.5    # fixed SAT exponent for the 1-par running-alpha parametrisation
 ETA_FIT   = 7.637e-10  # baryon-to-photon ratio for 2-par model Y_p/D/H
 
+# ── ΛCDM radiation (fixed externally from FIRAS, Fixsen 2009, ApJ 707, 916) ──
+_TCMB_K      = 2.72548                         # T_CMB from FIRAS spectroscopy
+ORH2_FIX     = 4.18e-5                         # Ω_r h² = (π²/15) T⁴/ρ_c,0; FIRAS value
+H_FIX        = 0.70                            # h used only to evaluate Ω_r = Ω_r h²/h²
+OMEGA_R_LCDM = ORH2_FIX / H_FIX**2            # ≈ 8.53e-5; enters E_lcdm only
+
 # ── BBN physical constants ─────────────────────────────────────────────────────
 _T0_EV      = 2.7255 * 8.617333262e-5         # CMB temperature in eV
 _H0_SI      = 70.0 / 3.0856775814913673e19    # H0=70 km/s/Mpc in s^-1
@@ -81,8 +87,9 @@ Z_MAX = max(z_bao.max(), z_sn.max())
 # ── E(z) builders ────────────────────────────────────────────────────────────
 
 def E_lcdm(om, n=5000):
-    zf = np.linspace(0, Z_MAX*1.01, n)
-    return zf, np.sqrt(om*(1+zf)**3 + (1-om))
+    zf  = np.linspace(0, Z_MAX*1.01, n)
+    om_l = 1.0 - om - OMEGA_R_LCDM
+    return zf, np.sqrt(om*(1+zf)**3 + OMEGA_R_LCDM*(1+zf)**4 + om_l)
 
 def E_hippopede(alpha_z_func, n=5000):
     """E(z) grid for running-alpha model using ALPHA_LOW for the geometry."""
@@ -441,9 +448,12 @@ _eta_fit = brentq(lambda e: compute_abundances(rf_2par, eta=e)['D_H'] - DH_OBS, 
 _dDH_deta = (compute_abundances(rf_2par, eta=_eta_fit+1e-12)['D_H'] - compute_abundances(rf_2par, eta=_eta_fit-1e-12)['D_H']) / 2e-12
 sig_eta = SIG_DH_OBS / abs(_dDH_deta) if abs(_dDH_deta) > 1e-20 else float('nan')
 
-# σ(Ω_r h²) from σ_H=4%: gm=sqrt(Ω_r/Ω_r_std), d(gm)/d(Ω_r)=1/(2*Ω_r_std) → σ(Ω_r)=2*σ_H*Ω_r_std
-ORH2_STD = 4.18e-5
-sig_orh2 = 2 * SIGMA_H_BBN * ORH2_STD
+# η_ΛCDM: invert D/H to match D/H^obs with H=H_std (ΛCDM second free param in BBN fit)
+_eta_lcdm = brentq(lambda e: compute_abundances(lambda T: 1.0, eta=e)['D_H'] - DH_OBS, 5e-10, 10e-10)
+_dDH_deta_lcdm = (compute_abundances(lambda T: 1.0, eta=_eta_lcdm+1e-12)['D_H'] -
+                  compute_abundances(lambda T: 1.0, eta=_eta_lcdm-1e-12)['D_H']) / 2e-12
+sig_eta_lcdm = SIG_DH_OBS / abs(_dDH_deta_lcdm) if abs(_dDH_deta_lcdm) > 1e-20 else float('nan')
+abund_lcdm_bbn = compute_abundances(lambda T: 1.0, eta=_eta_lcdm)
 
 MODEL  = "Hyp a-run"
 
@@ -510,12 +520,14 @@ row_t1("BAO+SN", MODEL, 1,
         dh=_paren(float(abund_1par_bao['D_H']*1e5), sig_dh_bao),
         k_model=1, k_lcdm=1)
 
-# ΛCDM reference (k=1)
+# ΛCDM reference (k=1); BBN prediction at ETA_STD with H=H_std
 zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
 row_t1("BAO+SN", "ΛCDM (ref)", 1,
         f"Ω_m={_paren(res_jnt.x, sig_om_jnt)}",
-        zf_lcdm, Ef_lcdm, "---",
-        yp="---", dh="---", k_model=1, k_lcdm=1)
+        zf_lcdm, Ef_lcdm, "1.000",
+        yp=f"{float(abund_sbbn['Y_p']):.3f}",
+        dh=_paren(float(abund_sbbn['D_H']*1e5), float(SIG_DH_OBS*1e5)),
+        k_model=1, k_lcdm=1)
 
 print(sep)
 print("BAO+SN+BBN block:")
@@ -539,12 +551,12 @@ row_t1("BAO+SN+BBN", MODEL, 3,
         k_model=3, k_lcdm=2,
         c2_bbn=0.0)
 
-# ΛCDM reference (k=2: Ω_m + Ω_r; chi2 same as 1-par since Ω_r negligible at DESI z)
+# ΛCDM reference (k=2: Ω_m + η; Ω_r h²=4.18e-5 fixed from FIRAS)
 row_t1("BAO+SN+BBN", "ΛCDM (ref)", 2,
-        f"Ω_m={_paren(res_jnt.x, sig_om_jnt)}, Ω_r h²={_paren(ORH2_STD*1e5, sig_orh2*1e5)}e-5",
-        zf_lcdm, Ef_lcdm, "1",
-        yp=_paren(0.2453, 0.0034),   # observed Aver et al. 2021
-        dh=_paren(float(abund_sbbn['D_H']*1e5), 0.030),
+        f"Ω_m={_paren(res_jnt.x, sig_om_jnt)}, η={_paren(_eta_lcdm*1e10, sig_eta_lcdm*1e10)}e-10",
+        zf_lcdm, Ef_lcdm, "1.000",
+        yp=f"{float(abund_lcdm_bbn['Y_p']):.3f}",
+        dh=_paren(float(abund_lcdm_bbn['D_H']*1e5), float(SIG_DH_OBS*1e5)),
         k_model=2, k_lcdm=2)
 
 print(sep)
