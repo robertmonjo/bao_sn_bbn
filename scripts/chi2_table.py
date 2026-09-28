@@ -12,6 +12,7 @@ import csv, sys
 from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize_scalar, brentq
+from scipy.interpolate import interp1d as _interp1d
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -25,7 +26,7 @@ from bbn_hyperconical import compute_abundances, ETA_STD
 _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
 ALPHA_LOW, ALPHA_HIGH = 0.283, 0.500
 N_SAT_FIX = 0.5    # fixed SAT exponent for the 1-par running-alpha parametrisation
-ETA_FIT   = 7.61e-10  # baryon-to-photon ratio for 2-par model Y_p/D/H
+ETA_FIT   = 7.637e-10  # baryon-to-photon ratio for 2-par model Y_p/D/H
 
 # ── BBN physical constants ─────────────────────────────────────────────────────
 _T0_EV      = 2.7255 * 8.617333262e-5         # CMB temperature in eV
@@ -145,6 +146,32 @@ def chi2_sn(zf, Ef):
 
 def chi2_joint(zf, Ef):
     return chi2_bao(zf,Ef) + chi2_sn(zf,Ef)
+
+# ── Profile-likelihood uncertainty helpers ────────────────────────────────────
+
+def _profile_sig(f_c2, x_opt, c2_opt, x_lo, x_hi, n=501):
+    """1σ uncertainty from Δχ²=1 profile."""
+    xg = np.linspace(x_lo, x_hi, n)
+    cg = np.array([f_c2(x) for x in xg])
+    fi = _interp1d(xg, cg - c2_opt, kind='cubic', fill_value='extrapolate')
+    try:
+        xl = brentq(lambda x: fi(x)-1., xg[0], x_opt)
+        xh = brentq(lambda x: fi(x)-1., x_opt, xg[-1])
+        return (xh - xl) / 2.
+    except Exception:
+        return float('nan')
+
+def _paren(val, sig):
+    """Parenthesized notation: e.g. 0.320(10), 1.000(40).
+
+    Uses 2 significant figures in the parenthesized uncertainty, consistent
+    with the physics convention for errors < 1.
+    """
+    import math
+    if sig <= 0 or np.isnan(sig) or np.isinf(sig):
+        return f"{val:.3g}"
+    p = max(0, -int(math.floor(math.log10(abs(sig)))) + 1)
+    return f"{val:.{p}f}({round(sig * 10**p):.0f})"
 
 # ── ΛCDM references ───────────────────────────────────────────────────────────
 
@@ -342,6 +369,82 @@ abund_1par_bbn = compute_abundances(rf_1par_bbn, eta=ETA_STD)
 # SBBN reference (ratio=1) for ΛCDM BBN row
 abund_sbbn = compute_abundances(lambda T: 1.0, eta=ETA_STD)
 
+# ── σ for each fitted parameter ───────────────────────────────────────────────
+_dah = 0.0002
+
+# σ(α_const) from profile χ²_joint
+sig_alpha_const = _profile_sig(
+    lambda a: chi2_joint(*E_hippopede_const(a)),
+    alpha_const_opt, res_alpha_const.fun, 0.20, 0.50)
+
+# σ(Ω_m) from profile χ²_joint
+sig_om_jnt = _profile_sig(
+    lambda om: chi2_joint(*E_lcdm(om)),
+    res_jnt.x, res_jnt.fun, 0.1, 0.6)
+
+# σ(ah_bao) from profile χ²_joint
+sig_ah_bao = _profile_sig(
+    lambda ah: chi2_joint(*E_hippopede(sat(N_SAT_FIX, ah))),
+    ah_bao_opt, res_ah_bao.fun, 0.30, 0.65)
+
+# σ(ah_bbn) from d(H_norm)/d(ah) and σ_H=4%
+_dhn_dah_bbn = (bbn_geomean(N_SAT_FIX, ah_bbn_opt+_dah) - bbn_geomean(N_SAT_FIX, ah_bbn_opt-_dah)) / (2*_dah)
+sig_ah_bbn = SIGMA_H_BBN / abs(_dhn_dah_bbn)
+
+# σ(al_2par) from profile χ²_joint at fixed ah_2par
+_c2_al2 = chi2_joint(*E_hippopede_al(sat(N_SAT_FIX, ah_2par, al_2par), al=al_2par))
+sig_al_2par = _profile_sig(
+    lambda al: chi2_joint(*E_hippopede_al(sat(N_SAT_FIX, ah_2par, al), al=al)),
+    al_2par, _c2_al2, 0.15, 0.42)
+
+# σ(ah_2par) from d(Y_p)/d(ah_2par) and σ_Yp=0.0034
+_SIG_YP = 0.0034
+_r2_lo = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par-_dah, al=al_2par), eta=ETA_FIT)
+_r2_hi = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par+_dah, al=al_2par), eta=ETA_FIT)
+_dYp_dah2 = (_r2_hi['Y_p'] - _r2_lo['Y_p']) / (2*_dah)
+sig_ah_2par = _SIG_YP / abs(_dYp_dah2) if abs(_dYp_dah2) > 1e-10 else float('nan')
+
+# ── Propagated BBN predictions ────────────────────────────────────────────────
+
+# const-alpha: Y_p≈0, D/H=0.31(1) (al=ah=alpha_const)
+_rf_const_bbn = bbn_ratio_func(N_SAT_FIX, alpha_const_opt, al=alpha_const_opt)
+_r_const_bbn = compute_abundances(_rf_const_bbn, eta=ETA_STD)
+_yp_const = float(_r_const_bbn['Y_p'])
+_dh_const = float(_r_const_bbn['D_H']*1e5)
+_dh_c_lo = compute_abundances(bbn_ratio_func(N_SAT_FIX, alpha_const_opt-_dah, al=alpha_const_opt-_dah), eta=ETA_STD)['D_H']*1e5
+_dh_c_hi = compute_abundances(bbn_ratio_func(N_SAT_FIX, alpha_const_opt+_dah, al=alpha_const_opt+_dah), eta=ETA_STD)['D_H']*1e5
+sig_dh_const = abs(_dh_c_hi - _dh_c_lo) / (2*_dah) * sig_alpha_const
+
+# Const-alpha H_norm sigma
+_dgm_da_const = (bbn_geomean_const(alpha_const_opt+_dah) - bbn_geomean_const(alpha_const_opt-_dah)) / (2*_dah)
+sig_gm_const = abs(_dgm_da_const) * sig_alpha_const
+
+# n=1 BAO+SN: H_norm, Y_p, D/H from σ(ah_bao)
+sig_gm_bao = abs(bbn_geomean(N_SAT_FIX, ah_bao_opt+_dah) - bbn_geomean(N_SAT_FIX, ah_bao_opt-_dah)) / (2*_dah) * sig_ah_bao
+_r_lo_bao = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_bao_opt-_dah), eta=ETA_STD)
+_r_hi_bao = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_bao_opt+_dah), eta=ETA_STD)
+sig_yp_bao = abs(_r_hi_bao['Y_p'] - _r_lo_bao['Y_p']) / (2*_dah) * sig_ah_bao
+sig_dh_bao = abs(_r_hi_bao['D_H'] - _r_lo_bao['D_H']) / (2*_dah) * sig_ah_bao * 1e5
+
+# n=1 BBN: Y_p, D/H from σ(ah_bbn)
+_r_lo_bbn2 = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_bbn_opt-_dah), eta=ETA_STD)
+_r_hi_bbn2 = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_bbn_opt+_dah), eta=ETA_STD)
+sig_yp_bbn = abs(_r_hi_bbn2['Y_p'] - _r_lo_bbn2['Y_p']) / (2*_dah) * sig_ah_bbn
+sig_dh_bbn = abs(_r_hi_bbn2['D_H'] - _r_lo_bbn2['D_H']) / (2*_dah) * sig_ah_bbn * 1e5
+
+# n=3 BBN: H_norm from σ(ah_2par)
+sig_gm_2par = abs(bbn_geomean(N_SAT_FIX, ah_2par+_dah, al=al_2par) - bbn_geomean(N_SAT_FIX, ah_2par-_dah, al=al_2par)) / (2*_dah) * sig_ah_2par
+
+# η_fit from D/H inversion; σ(η) from σ(D/H_obs)
+DH_OBS = 2.527e-5; SIG_DH_OBS = 0.030e-5
+_eta_fit = brentq(lambda e: compute_abundances(rf_2par, eta=e)['D_H'] - DH_OBS, 6e-10, 11e-10)
+_dDH_deta = (compute_abundances(rf_2par, eta=_eta_fit+1e-12)['D_H'] - compute_abundances(rf_2par, eta=_eta_fit-1e-12)['D_H']) / 2e-12
+sig_eta = SIG_DH_OBS / abs(_dDH_deta) if abs(_dDH_deta) > 1e-20 else float('nan')
+
+# σ(Ω_r h²) from σ_H=4%: gm=sqrt(Ω_r/Ω_r_std), d(gm)/d(Ω_r)=1/(2*Ω_r_std) → σ(Ω_r)=2*σ_H*Ω_r_std
+ORH2_STD = 4.18e-5
+sig_orh2 = 2 * SIGMA_H_BBN * ORH2_STD
+
 MODEL  = "Hyp a-run"
 
 # ── Table-1 output ────────────────────────────────────────────────────────────
@@ -362,8 +465,8 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
     nb = c2b / DOF_BAO; ns = c2s / DOF_SN
     db = c2b - c2b_jnt; ds = c2s - c2s_jnt
     dj = (c2j - c2j_lcdm) + 2*(k_model - k_lcdm)
-    yp_s = f"{yp:.2f}" if isinstance(yp, float) else str(yp)
-    dh_s = f"{dh:.1f}" if isinstance(dh, float) else str(dh)
+    yp_s = str(yp)
+    dh_s = str(dh)
     print(f"{constraint:<14} {model:<18} {n_free:>2}  {param:<24} "
           f"{bbn_norm:>7}  {yp_s:>5}  {dh_s:>5}  "
           f"{nb:>7.3f}  {ns:>7.3f}  {db:>+7.2f}  {ds:>+7.2f}  {dj:>+7.2f}")
@@ -383,32 +486,34 @@ print("BAO+SN block:")
 # Hyp. const-α (BAO+SN-optimal, k=1 vs ΛCDM k=1)
 zfc_opt, Efc_opt = E_hippopede_const(alpha_const_opt)
 row_t1("BAO+SN", "Hyp const-α", 1,
-        f"α={alpha_const_opt:.3f}",
-        zfc_opt, Efc_opt, f"~{gm_const_opt:.2f}",
-        yp="---", dh="---", k_model=1, k_lcdm=1)
+        f"α={_paren(alpha_const_opt, sig_alpha_const)}",
+        zfc_opt, Efc_opt, _paren(gm_const_opt, sig_gm_const),
+        yp="≈0" if _yp_const < 1e-6 else f"{_yp_const:.3f}",
+        dh=_paren(_dh_const, sig_dh_const),
+        k_model=1, k_lcdm=1)
 
 # Hyp. a-run, 0-par (ah=1/2, N_SAT_FIX exponent both fixed; k=0 vs ΛCDM k=1)
 zf0, Ef0 = E_hippopede(sat(N_SAT_FIX, 0.500))
 row_t1("BAO+SN", MODEL, 0,
         "ah=1/2 (fix)",
         zf0, Ef0, f"~{bbn_geomean(N_SAT_FIX, 0.500):.1f}",
-        yp=float(abund_0par["Y_p"]),
-        dh=float(abund_0par["D_H"]*1e5),
+        yp=f"{float(abund_0par['Y_p']):.2f}",
+        dh=f"{float(abund_0par['D_H']*1e5):.1f}",
         k_model=0, k_lcdm=1)
 
 # Hyp. a-run, 1-par (ah free, joint BAO+SN optimal; k=1 vs ΛCDM k=1)
 zf1, Ef1 = E_hippopede(sat(N_SAT_FIX, ah_bao_opt))
 row_t1("BAO+SN", MODEL, 1,
-        f"ah={ah_bao_opt:.3f}",
-        zf1, Ef1, f"~{gm_ah_bao:.2f}",
-        yp=float(abund_1par_bao["Y_p"]),
-        dh=float(abund_1par_bao["D_H"]*1e5),
+        f"ah={_paren(ah_bao_opt, sig_ah_bao)}",
+        zf1, Ef1, _paren(gm_ah_bao, sig_gm_bao),
+        yp=f"{abund_1par_bao['Y_p']:.2f}±{sig_yp_bao:.2f}",
+        dh=_paren(float(abund_1par_bao['D_H']*1e5), sig_dh_bao),
         k_model=1, k_lcdm=1)
 
 # ΛCDM reference (k=1)
 zf_lcdm, Ef_lcdm = E_lcdm(res_jnt.x)
 row_t1("BAO+SN", "ΛCDM (ref)", 1,
-        f"Ω_m={res_jnt.x:.3f}",
+        f"Ω_m={_paren(res_jnt.x, sig_om_jnt)}",
         zf_lcdm, Ef_lcdm, "---",
         yp="---", dh="---", k_model=1, k_lcdm=1)
 
@@ -418,28 +523,28 @@ print("BAO+SN+BBN block:")
 # Hyp. a-run, 1-par BBN-constrained (ah free, gm=1; k=1 vs ΛCDM k=2)
 zfb, Efb = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
 row_t1("BAO+SN+BBN", MODEL, 1,
-        f"ah={ah_bbn_opt:.4f}",
-        zfb, Efb, f"{gm_ah_bbn:.3f}",
-        yp=float(abund_1par_bbn["Y_p"]),
-        dh=float(abund_1par_bbn["D_H"]*1e5),
+        f"ah={_paren(ah_bbn_opt, sig_ah_bbn)}",
+        zfb, Efb, _paren(gm_ah_bbn, SIGMA_H_BBN),
+        yp=_paren(float(abund_1par_bbn['Y_p']), sig_yp_bbn),
+        dh=_paren(float(abund_1par_bbn['D_H']*1e5), sig_dh_bbn),
         k_model=1, k_lcdm=2,
         c2_bbn=chi2_bbn(gm_ah_bbn))
 
 # Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2, no BBN chi2 term)
 row_t1("BAO+SN+BBN", MODEL, 3,
-        f"al={al_2par}, ah={ah_2par}",
-        zf_2par, Ef_2par, f"~{gm_2par:.2f}",
-        yp=float(abund_2par["Y_p"]),
-        dh=float(abund_2par["D_H"]*1e5),
+        f"al={_paren(al_2par, sig_al_2par)}, ah={_paren(ah_2par, sig_ah_2par)}, eta={_paren(_eta_fit*1e10, sig_eta*1e10)}e-10",
+        zf_2par, Ef_2par, _paren(gm_2par, sig_gm_2par),
+        yp=_paren(float(abund_2par['Y_p']), _SIG_YP),
+        dh=_paren(float(abund_2par['D_H']*1e5), float(SIG_DH_OBS*1e5)),
         k_model=3, k_lcdm=2,
         c2_bbn=0.0)
 
 # ΛCDM reference (k=2: Ω_m + Ω_r; chi2 same as 1-par since Ω_r negligible at DESI z)
 row_t1("BAO+SN+BBN", "ΛCDM (ref)", 2,
-        f"Ω_m={res_jnt.x:.3f}",
+        f"Ω_m={_paren(res_jnt.x, sig_om_jnt)}, Ω_r h²={_paren(ORH2_STD*1e5, sig_orh2*1e5)}e-5",
         zf_lcdm, Ef_lcdm, "1",
-        yp=float(abund_sbbn["Y_p"]),
-        dh=float(abund_sbbn["D_H"]*1e5),
+        yp=_paren(0.2453, 0.0034),   # observed Aver et al. 2021
+        dh=_paren(float(abund_sbbn['D_H']*1e5), 0.030),
         k_model=2, k_lcdm=2)
 
 print(sep)
