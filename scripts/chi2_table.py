@@ -472,8 +472,9 @@ MODEL  = "Hyp a-run"
 # ── Table-1 output ────────────────────────────────────────────────────────────
 
 def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
-           yp="---", dh="---", k_model=1, k_lcdm=1, c2_bbn=0.0, c2_bbn_ref=0.0):
-    """Print one Table 1 row (12 columns).
+           yp="---", dh="---", k_model=1, k_lcdm=1, c2_bbn=0.0, c2_bbn_ref=0.0,
+           dof_bbn=None):
+    """Print one Table 1 row (14 columns).
 
     bbn_norm   : string shown in H_norm column (geometric mean H_model/H_std at BBN)
     yp         : Y_p value (float) or "---"
@@ -482,6 +483,7 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
     k_lcdm     : free parameters in the ΛCDM reference (for ΔAIC)
     c2_bbn     : χ²_BBN contribution for this model row
     c2_bbn_ref : χ²_BBN contribution for the ΛCDM reference (subtracted from ΔAIC)
+    dof_bbn    : BBN degrees of freedom (None → print '---' for BBN chi2 columns)
     """
     c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef)
     c2j = c2b + c2s + c2_bbn
@@ -490,13 +492,20 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
     dj = (c2j - c2j_lcdm - c2_bbn_ref) + 2*(k_model - k_lcdm)
     yp_s = str(yp)
     dh_s = str(dh)
+    if dof_bbn is not None:
+        nb_bbn = f"{c2_bbn / dof_bbn:.2f}"
+        dc2_bbn = f"{c2_bbn - c2_bbn_ref:+.2f}"
+    else:
+        nb_bbn = "---"; dc2_bbn = "---"
     print(f"{constraint:<14} {model:<18} {n_free:>2}  {param:<24} "
           f"{bbn_norm:>7}  {yp_s:>5}  {dh_s:>5}  "
-          f"{nb:>7.3f}  {ns:>7.3f}  {db:>+7.2f}  {ds:>+7.2f}  {dj:>+7.2f}")
+          f"{nb:>7.3f}  {ns:>7.3f}  {nb_bbn:>7}  "
+          f"{db:>+7.2f}  {ds:>+7.2f}  {dc2_bbn:>7}  {dj:>+7.2f}")
 
 hdr = (f"{'Constraint':<14} {'Model':<18}  n  {'Parameters':<24} "
        f"{'H_norm':>7}  {'Y_p':>5}  {'D/H':>5}  "
-       f"{'χ²ν_BAO':>7}  {'χ²ν_SN':>7}  {'Δχ²_BAO':>7}  {'Δχ²_SN':>7}  {'ΔAIC':>7}")
+       f"{'χ²ν_BAO':>7}  {'χ²ν_SN':>7}  {'χ²ν_BBN':>7}  "
+       f"{'Δχ²_BAO':>7}  {'Δχ²_SN':>7}  {'Δχ²_BBN':>7}  {'ΔAIC':>7}")
 sep = "-" * len(hdr)
 print(hdr)
 print(f"  (D/H in units of 1e-5; H_norm = geometric mean H_model/H_std at T=0.07–0.10 MeV)")
@@ -553,7 +562,8 @@ row_t1("BAO+SN+BBN", MODEL, 1,
         yp=_paren(float(abund_1par_bbn['Y_p']), sig_yp_bbn),
         dh=_paren(float(abund_1par_bbn['D_H']*1e5), sig_dh_bbn),
         k_model=1, k_lcdm=2,
-        c2_bbn=_c2_bbn_1par, c2_bbn_ref=_c2_yp_lcdm_bbn)
+        c2_bbn=_c2_bbn_1par, c2_bbn_ref=_c2_yp_lcdm_bbn,
+        dof_bbn=2)
 
 # Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2; chi2_BBN from Y_p residual)
 row_t1("BAO+SN+BBN", MODEL, 3,
@@ -562,7 +572,8 @@ row_t1("BAO+SN+BBN", MODEL, 3,
         yp=_paren(float(abund_2par['Y_p']), _SIG_YP),
         dh=_paren(float(abund_2par['D_H']*1e5), float(SIG_DH_OBS*1e5)),
         k_model=3, k_lcdm=2,
-        c2_bbn=_c2_yp_2par, c2_bbn_ref=_c2_yp_lcdm_bbn)
+        c2_bbn=_c2_yp_2par, c2_bbn_ref=_c2_yp_lcdm_bbn,
+        dof_bbn=1)
 
 # ΛCDM reference (k=2: Ω_m + η; chi2_BBN from Y_p residual; by construction ΔAIC=0)
 row_t1("BAO+SN+BBN", "ΛCDM (ref)", 2,
@@ -571,6 +582,7 @@ row_t1("BAO+SN+BBN", "ΛCDM (ref)", 2,
         yp=f"{float(abund_lcdm_bbn['Y_p']):.3f}",
         dh=_paren(float(abund_lcdm_bbn['D_H']*1e5), float(SIG_DH_OBS*1e5)),
         k_model=2, k_lcdm=2,
-        c2_bbn=_c2_yp_lcdm_bbn, c2_bbn_ref=_c2_yp_lcdm_bbn)
+        c2_bbn=_c2_yp_lcdm_bbn, c2_bbn_ref=_c2_yp_lcdm_bbn,
+        dof_bbn=1)
 
 print(sep)
