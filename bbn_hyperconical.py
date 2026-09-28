@@ -3,8 +3,14 @@
 """
 BBN abundance calculator for a modified Hubble rate H_model(T)/H_std(T).
 
-Physics: Kolb & Turner (1990), Mukhanov (2005) analytical approximations.
-Accuracy target: ~5% in Y_p; D/H uses empirical power-law scaling.
+Physics: Kolb & Turner (1990), Mukhanov (2005) analytical approximations,
+recalibrated against the accurate SBBN prediction of Fields, Olive, Yeh &
+Young (2020), arXiv:1912.01132 (Y_p = 0.24709 +/- 0.00017 at eta = 6.11e-10).
+
+The T^5 approximation for weak rates overestimates the effective freeze-out
+temperature and underestimates the elapsed decay time, biasing Y_p high by
+~4%. The calibration corrects for this by finding the effective nucleosynthesis
+completion temperature T_nuc that recovers the accurate SBBN Y_p.
 
 Usage:
     python bbn_hyperconical.py
@@ -21,7 +27,10 @@ hbar    = 6.582e-22   # MeV*s
 M_pl    = 1.2209e22   # MeV  Planck mass (non-reduced)
 ETA_STD = 6.11e-10    # baryon-to-photon ratio (Planck 2018)
 D_H_STD = 2.527e-5    # SBBN reference D/H at ETA_STD
-T_f_std = 0.808       # MeV  standard weak freeze-out calibration point
+T_f_std = 0.808       # MeV  weak freeze-out calibration (T^5 approximation)
+
+# Accurate SBBN Y_p from Fields, Olive, Yeh & Young 2020 (arXiv:1912.01132).
+_YP_SBBN_CALIB = 0.24709
 
 
 def g_star(T):
@@ -45,6 +54,26 @@ _Gamma_ref = H_std_MeV(T_f_std)
 def Gamma_weak(T):
     """Effective weak n<->p rate in MeV (natural units)."""
     return _Gamma_ref * (T / T_f_std)**5
+
+
+def _yp_sbbn_at_Tnuc(T_nuc_mev):
+    """SBBN Y_p from the analytical calculator at a given T_nuc."""
+    n_p_f = np.exp(-Q_np / T_f_std)
+    split = [0.511] if T_f_std > 0.511 > T_nuc_mev else []
+    def _dt(T):
+        return hbar / (H_std_MeV(T) * T)
+    t_el, _ = quad(_dt, T_nuc_mev, T_f_std, limit=300, points=split)
+    n_p_nuc = n_p_f * np.exp(-lam_n * t_el)
+    return 2.0 * n_p_nuc / (1.0 + n_p_nuc)
+
+
+# Calibrated T_nuc: the effective nucleosynthesis completion temperature that
+# recovers Y_p_SBBN = 0.24709 (Fields+2020). The T^5 approximation gives
+# T_nuc = 0.066 MeV -> Y_p = 0.256; the calibrated value is ~0.062 MeV.
+T_nuc = brentq(
+    lambda Tn: _yp_sbbn_at_Tnuc(Tn) - _YP_SBBN_CALIB,
+    0.045, 0.075, xtol=1e-7,
+)
 
 
 def compute_abundances(ratio_func, eta=ETA_STD):
@@ -73,16 +102,15 @@ def compute_abundances(ratio_func, eta=ETA_STD):
     # 2. n/p ratio at freeze-out (Boltzmann equilibrium)
     n_p_f = np.exp(-Q_np / T_f)
 
-    # 3. Time from freeze-out to nucleosynthesis (deuterium bottleneck)
-    #    From dT/dt = -H*T  =>  dt = dT / (H_mod * T)
-    T_nuc = 0.066  # MeV  (Wagoner 1973; D bottleneck breaks here)
+    # 3. Time from freeze-out to nucleosynthesis (deuterium bottleneck).
+    #    T_nuc is the calibrated completion temperature (module constant).
     split = [0.511] if T_f > 0.511 > T_nuc else []
 
     def dt_dT(T):
         H_mod = ratio_func(T) * H_std_MeV(T)   # MeV (natural units)
         return hbar / (H_mod * T)               # s / MeV
 
-    t_elapsed, _ = quad(dt_dT, T_nuc, T_f, limit=300, points=split)
+    t_elapsed, _ = quad(dt_dT, T_nuc, T_f, limit=600, points=split, epsrel=1e-5)
 
     # 4. n/p corrected for neutron decay during that window
     n_p_nuc = n_p_f * np.exp(-lam_n * t_elapsed)
