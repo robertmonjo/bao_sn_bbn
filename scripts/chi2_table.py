@@ -376,6 +376,13 @@ abund_1par_bao = compute_abundances(rf_1par_bao, eta=ETA_STD)
 rf_1par_bbn = bbn_ratio_func(N_SAT_FIX, ah_bbn_opt)
 abund_1par_bbn = compute_abundances(rf_1par_bbn, eta=ETA_STD)
 
+# 1-par+η BBN: same ah as 1-par but η fitted to D/H (n=2 vs ΛCDM n=2)
+eta_1par_bbn_fit = brentq(lambda e: compute_abundances(rf_1par_bbn, eta=e)['D_H'] - DH_OBS, 4e-10, 11e-10)
+abund_1par_bbn_eta = compute_abundances(rf_1par_bbn, eta=eta_1par_bbn_fit)
+_dDH_deta_1par = (compute_abundances(rf_1par_bbn, eta=eta_1par_bbn_fit+1e-12)['D_H'] -
+                  compute_abundances(rf_1par_bbn, eta=eta_1par_bbn_fit-1e-12)['D_H']) / 2e-12
+sig_eta_1par_bbn = SIG_DH_OBS / abs(_dDH_deta_1par) if abs(_dDH_deta_1par) > 1e-20 else float('nan')
+
 # SBBN reference (ratio=1) for ΛCDM BBN row
 abund_sbbn = compute_abundances(lambda T: 1.0, eta=ETA_STD)
 
@@ -467,6 +474,9 @@ _c2_yp_1par_bbn = ((abund_1par_bbn['Y_p'] - _YP_OBS) / _SIG_YP)**2
 _c2_dh_1par_bbn = ((abund_1par_bbn['D_H'] - DH_OBS) / SIG_DH_OBS)**2
 _c2_bbn_1par    = _c2_yp_1par_bbn + _c2_dh_1par_bbn
 
+# 1-par+η BBN: η absorbs D/H, so only Y_p residual contributes; dof_bbn=1
+_c2_yp_1par_bbn_eta = ((abund_1par_bbn_eta['Y_p'] - _YP_OBS) / _SIG_YP)**2
+
 MODEL  = "Hyp a-run"
 
 # ── Table-1 output ────────────────────────────────────────────────────────────
@@ -493,14 +503,16 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
     yp_s = str(yp)
     dh_s = str(dh)
     if dof_bbn is not None:
-        nb_bbn = f"{c2_bbn / dof_bbn:.2f}"
-        dc2_bbn = f"{c2_bbn - c2_bbn_ref:+.2f}"
+        _c2b_nu = c2_bbn / dof_bbn
+        nb_bbn  = f"{_c2b_nu:.0f}" if _c2b_nu >= 10 else f"{_c2b_nu:.2f}"
+        _dc2b   = c2_bbn - c2_bbn_ref
+        dc2_bbn = f"{_dc2b:+.0f}" if abs(_dc2b) >= 10 else f"{_dc2b:+.2f}"
     else:
         nb_bbn = "---"; dc2_bbn = "---"
     print(f"{constraint:<14} {model:<18} {n_free:>2}  {param:<24} "
           f"{bbn_norm:>7}  {yp_s:>5}  {dh_s:>5}  "
-          f"{nb:>7.3f}  {ns:>7.3f}  {nb_bbn:>7}  "
-          f"{db:>+7.2f}  {ds:>+7.2f}  {dc2_bbn:>7}  {dj:>+7.2f}")
+          f"{nb:>6.2f}  {ns:>6.2f}  {nb_bbn:>7}  "
+          f"{db:>+6.1f}  {ds:>+6.1f}  {dc2_bbn:>7}  {dj:>+7.1f}")
 
 hdr = (f"{'Constraint':<14} {'Model':<18}  n  {'Parameters':<24} "
        f"{'H_norm':>7}  {'Y_p':>5}  {'D/H':>5}  "
@@ -564,6 +576,16 @@ row_t1("BAO+SN+BBN", MODEL, 1,
         k_model=1, k_lcdm=2,
         c2_bbn=_c2_bbn_1par, c2_bbn_ref=_c2_yp_lcdm_bbn,
         dof_bbn=2)
+
+# Hyp. a-run, 1-par+η (ah fixed at BBN-optimal, η free to fit D/H; n=2 vs ΛCDM n=2; shows Y_p still 0.153)
+row_t1("BAO+SN+BBN", MODEL, 2,
+        f"ah={_paren(ah_bbn_opt, sig_ah_bbn)}, eta={_paren(eta_1par_bbn_fit*1e10, sig_eta_1par_bbn*1e10)}e-10",
+        zfb, Efb, _paren(gm_ah_bbn, SIGMA_H_BBN),
+        yp=_paren(float(abund_1par_bbn_eta['Y_p']), sig_yp_bbn),
+        dh=_paren(float(abund_1par_bbn_eta['D_H']*1e5), float(SIG_DH_OBS*1e5)),
+        k_model=2, k_lcdm=2,
+        c2_bbn=_c2_yp_1par_bbn_eta, c2_bbn_ref=_c2_yp_lcdm_bbn,
+        dof_bbn=1)
 
 # Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2; chi2_BBN from Y_p residual)
 row_t1("BAO+SN+BBN", MODEL, 3,
