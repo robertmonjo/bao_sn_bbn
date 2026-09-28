@@ -357,7 +357,10 @@ al_2par, ah_2par = 0.255, 0.4364
 zf_2par, Ef_2par = E_hippopede_al(sat(N_SAT_FIX, ah_2par, al_2par), al=al_2par)
 gm_2par = bbn_geomean(N_SAT_FIX, ah_2par, al=al_2par)
 rf_2par = bbn_ratio_func(N_SAT_FIX, ah_2par, al=al_2par)
-abund_2par = compute_abundances(rf_2par, eta=ETA_FIT)
+# η fitted to D/H before computing abund_2par (Bloquer 3 fix)
+DH_OBS = 2.527e-5; SIG_DH_OBS = 0.030e-5
+_eta_fit = brentq(lambda e: compute_abundances(rf_2par, eta=e)['D_H'] - DH_OBS, 6e-10, 11e-10)
+abund_2par = compute_abundances(rf_2par, eta=_eta_fit)
 
 # ── Y_p / D/H for BAO+SN running-alpha rows (0-par and 1-par, at ETA_STD) ────
 
@@ -406,8 +409,8 @@ sig_al_2par = _profile_sig(
 
 # σ(ah_2par) from d(Y_p)/d(ah_2par) and σ_Yp=0.0034
 _SIG_YP = 0.0034
-_r2_lo = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par-_dah, al=al_2par), eta=ETA_FIT)
-_r2_hi = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par+_dah, al=al_2par), eta=ETA_FIT)
+_r2_lo = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par-_dah, al=al_2par), eta=_eta_fit)
+_r2_hi = compute_abundances(bbn_ratio_func(N_SAT_FIX, ah_2par+_dah, al=al_2par), eta=_eta_fit)
 _dYp_dah2 = (_r2_hi['Y_p'] - _r2_lo['Y_p']) / (2*_dah)
 sig_ah_2par = _SIG_YP / abs(_dYp_dah2) if abs(_dYp_dah2) > 1e-10 else float('nan')
 
@@ -442,9 +445,7 @@ sig_dh_bbn = abs(_r_hi_bbn2['D_H'] - _r_lo_bbn2['D_H']) / (2*_dah) * sig_ah_bbn 
 # n=3 BBN: H_norm from σ(ah_2par)
 sig_gm_2par = abs(bbn_geomean(N_SAT_FIX, ah_2par+_dah, al=al_2par) - bbn_geomean(N_SAT_FIX, ah_2par-_dah, al=al_2par)) / (2*_dah) * sig_ah_2par
 
-# η_fit from D/H inversion; σ(η) from σ(D/H_obs)
-DH_OBS = 2.527e-5; SIG_DH_OBS = 0.030e-5
-_eta_fit = brentq(lambda e: compute_abundances(rf_2par, eta=e)['D_H'] - DH_OBS, 6e-10, 11e-10)
+# η_fit from D/H inversion; σ(η) from σ(D/H_obs) — DH_OBS and _eta_fit defined above
 _dDH_deta = (compute_abundances(rf_2par, eta=_eta_fit+1e-12)['D_H'] - compute_abundances(rf_2par, eta=_eta_fit-1e-12)['D_H']) / 2e-12
 sig_eta = SIG_DH_OBS / abs(_dDH_deta) if abs(_dDH_deta) > 1e-20 else float('nan')
 
@@ -460,6 +461,11 @@ abund_lcdm_bbn = compute_abundances(lambda T: 1.0, eta=_eta_lcdm)
 _YP_OBS = 0.2453
 _c2_yp_2par     = ((abund_2par['Y_p']    - _YP_OBS) / _SIG_YP)**2
 _c2_yp_lcdm_bbn = ((abund_lcdm_bbn['Y_p'] - _YP_OBS) / _SIG_YP)**2
+
+# 1-par BBN row: eta fixed at ETA_STD, so Y_p and D/H both contribute to chi²_BBN
+_c2_yp_1par_bbn = ((abund_1par_bbn['Y_p'] - _YP_OBS) / _SIG_YP)**2
+_c2_dh_1par_bbn = ((abund_1par_bbn['D_H'] - DH_OBS) / SIG_DH_OBS)**2
+_c2_bbn_1par    = _c2_yp_1par_bbn + _c2_dh_1par_bbn
 
 MODEL  = "Hyp a-run"
 
@@ -539,7 +545,7 @@ row_t1("BAO+SN", "ΛCDM (ref)", 1,
 print(sep)
 print("BAO+SN+BBN block:")
 
-# Hyp. a-run, 1-par BBN-constrained (ah free, gm=1; k=1 vs ΛCDM k=2)
+# Hyp. a-run, 1-par BBN-constrained (ah free, gm=1; k=1 vs ΛCDM k=2; ΔAIC from Y_p+D/H residuals)
 zfb, Efb = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
 row_t1("BAO+SN+BBN", MODEL, 1,
         f"ah={_paren(ah_bbn_opt, sig_ah_bbn)}",
@@ -547,7 +553,7 @@ row_t1("BAO+SN+BBN", MODEL, 1,
         yp=_paren(float(abund_1par_bbn['Y_p']), sig_yp_bbn),
         dh=_paren(float(abund_1par_bbn['D_H']*1e5), sig_dh_bbn),
         k_model=1, k_lcdm=2,
-        c2_bbn=chi2_bbn(gm_ah_bbn))
+        c2_bbn=_c2_bbn_1par, c2_bbn_ref=_c2_yp_lcdm_bbn)
 
 # Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2; chi2_BBN from Y_p residual)
 row_t1("BAO+SN+BBN", MODEL, 3,
