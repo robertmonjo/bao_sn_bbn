@@ -566,17 +566,16 @@ row_t1("BAO+SN", "ΛCDM (ref)", 1,
 print(sep)
 print("BAO+SN+BBN block:")
 
-# Hyp. a-run, 1-par+η (ah fixed at BBN-optimal, η free to fit D/H; n=2 vs ΛCDM n=2; shows Y_p still 0.153)
-# (n=1 row dropped: identical BAO/SN chi2 to n=2, and n=2 is a stricter test of the model)
+# Hyp. a-run, 1-par BBN-constrained (ah free, gm=1; k=1 vs ΛCDM k=2; ΔAIC from Y_p+D/H residuals)
 zfb, Efb = E_hippopede(sat(N_SAT_FIX, ah_bbn_opt))
-row_t1("BAO+SN+BBN", MODEL, 2,
-        f"ah={_paren(ah_bbn_opt, sig_ah_bbn)}, eta={_paren(eta_1par_bbn_fit*1e10, sig_eta_1par_bbn*1e10)}e-10",
+row_t1("BAO+SN+BBN", MODEL, 1,
+        f"ah={_paren(ah_bbn_opt, sig_ah_bbn)}",
         zfb, Efb, _paren(gm_ah_bbn, SIGMA_H_BBN),
-        yp=_paren(float(abund_1par_bbn_eta['Y_p']), sig_yp_bbn),
-        dh=_paren(float(abund_1par_bbn_eta['D_H']*1e5), float(SIG_DH_OBS*1e5)),
-        k_model=2, k_lcdm=2,
-        c2_bbn=_c2_yp_1par_bbn_eta, c2_bbn_ref=_c2_yp_lcdm_bbn,
-        dof_bbn=1)
+        yp=_paren(float(abund_1par_bbn['Y_p']), sig_yp_bbn),
+        dh=_paren(float(abund_1par_bbn['D_H']*1e5), sig_dh_bbn),
+        k_model=1, k_lcdm=2,
+        c2_bbn=_c2_bbn_1par, c2_bbn_ref=_c2_yp_lcdm_bbn,
+        dof_bbn=2)
 
 # Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2; chi2_BBN from Y_p residual)
 row_t1("BAO+SN+BBN", MODEL, 3,
