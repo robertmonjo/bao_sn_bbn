@@ -289,7 +289,7 @@ ax_sn_res.set_ylim(-5, 5)
 ax_legend.axis("off")
 legend_handles = [
     Line2D([0], [0], color=COL_HYP,  lw=1.8,
-           label=r"Hyp. $\alpha$-run ($\alpha_{\rm h}=0.422$, $n=1$)"),
+           label=r"Hyp. $\alpha$-run ($n=1$, $\alpha_{\rm h}=0.422$)"),
     Line2D([0], [0], color=COL_HYP,  lw=0.9, ls=":",
            label=r"Hyp. $\alpha$-run ($n=3$, $\alpha_{\rm l}=0.255$, $\alpha_{\rm h}=0.436$)"),
     Line2D([0], [0], color=COL_LCDM, lw=1.4, ls="--",
