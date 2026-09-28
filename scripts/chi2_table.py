@@ -455,26 +455,33 @@ _dDH_deta_lcdm = (compute_abundances(lambda T: 1.0, eta=_eta_lcdm+1e-12)['D_H'] 
 sig_eta_lcdm = SIG_DH_OBS / abs(_dDH_deta_lcdm) if abs(_dDH_deta_lcdm) > 1e-20 else float('nan')
 abund_lcdm_bbn = compute_abundances(lambda T: 1.0, eta=_eta_lcdm)
 
+# ── Y_p chi² for BBN block rows ───────────────────────────────────────────────
+# η is fitted to D/H (chi²_DH = 0 by construction); only Y_p residual enters.
+_YP_OBS = 0.2453
+_c2_yp_2par     = ((abund_2par['Y_p']    - _YP_OBS) / _SIG_YP)**2
+_c2_yp_lcdm_bbn = ((abund_lcdm_bbn['Y_p'] - _YP_OBS) / _SIG_YP)**2
+
 MODEL  = "Hyp a-run"
 
 # ── Table-1 output ────────────────────────────────────────────────────────────
 
 def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
-           yp="---", dh="---", k_model=1, k_lcdm=1, c2_bbn=0.0):
+           yp="---", dh="---", k_model=1, k_lcdm=1, c2_bbn=0.0, c2_bbn_ref=0.0):
     """Print one Table 1 row (12 columns).
 
-    bbn_norm : string shown in H_norm column (geometric mean H_model/H_std at BBN)
-    yp       : Y_p value (float) or "---"
-    dh       : D/H × 10^5 (float) or "---"
-    k_model  : free parameters in the model (for ΔAIC)
-    k_lcdm   : free parameters in the ΛCDM reference (for ΔAIC)
-    c2_bbn   : χ²_BBN contribution (0 for BAO+SN-only rows)
+    bbn_norm   : string shown in H_norm column (geometric mean H_model/H_std at BBN)
+    yp         : Y_p value (float) or "---"
+    dh         : D/H × 10^5 (float) or "---"
+    k_model    : free parameters in the model (for ΔAIC)
+    k_lcdm     : free parameters in the ΛCDM reference (for ΔAIC)
+    c2_bbn     : χ²_BBN contribution for this model row
+    c2_bbn_ref : χ²_BBN contribution for the ΛCDM reference (subtracted from ΔAIC)
     """
     c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef)
     c2j = c2b + c2s + c2_bbn
     nb = c2b / DOF_BAO; ns = c2s / DOF_SN
     db = c2b - c2b_jnt; ds = c2s - c2s_jnt
-    dj = (c2j - c2j_lcdm) + 2*(k_model - k_lcdm)
+    dj = (c2j - c2j_lcdm - c2_bbn_ref) + 2*(k_model - k_lcdm)
     yp_s = str(yp)
     dh_s = str(dh)
     print(f"{constraint:<14} {model:<18} {n_free:>2}  {param:<24} "
@@ -542,21 +549,22 @@ row_t1("BAO+SN+BBN", MODEL, 1,
         k_model=1, k_lcdm=2,
         c2_bbn=chi2_bbn(gm_ah_bbn))
 
-# Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2, no BBN chi2 term)
+# Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2; chi2_BBN from Y_p residual)
 row_t1("BAO+SN+BBN", MODEL, 3,
         f"al={_paren(al_2par, sig_al_2par)}, ah={_paren(ah_2par, sig_ah_2par)}, eta={_paren(_eta_fit*1e10, sig_eta*1e10)}e-10",
         zf_2par, Ef_2par, _paren(gm_2par, sig_gm_2par),
         yp=_paren(float(abund_2par['Y_p']), _SIG_YP),
         dh=_paren(float(abund_2par['D_H']*1e5), float(SIG_DH_OBS*1e5)),
         k_model=3, k_lcdm=2,
-        c2_bbn=0.0)
+        c2_bbn=_c2_yp_2par, c2_bbn_ref=_c2_yp_lcdm_bbn)
 
-# ΛCDM reference (k=2: Ω_m + η; Ω_r h²=4.18e-5 fixed from FIRAS)
+# ΛCDM reference (k=2: Ω_m + η; chi2_BBN from Y_p residual; by construction ΔAIC=0)
 row_t1("BAO+SN+BBN", "ΛCDM (ref)", 2,
         f"Ω_m={_paren(res_jnt.x, sig_om_jnt)}, η={_paren(_eta_lcdm*1e10, sig_eta_lcdm*1e10)}e-10",
         zf_lcdm, Ef_lcdm, "1.000",
         yp=f"{float(abund_lcdm_bbn['Y_p']):.3f}",
         dh=_paren(float(abund_lcdm_bbn['D_H']*1e5), float(SIG_DH_OBS*1e5)),
-        k_model=2, k_lcdm=2)
+        k_model=2, k_lcdm=2,
+        c2_bbn=_c2_yp_lcdm_bbn, c2_bbn_ref=_c2_yp_lcdm_bbn)
 
 print(sep)
