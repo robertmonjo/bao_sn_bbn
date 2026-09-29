@@ -471,6 +471,9 @@ sig_gm_2par = abs(bbn_geomean(N_SAT_FIX, ah_2par+_dah, al=al_2par) - bbn_geomean
 # η_fit from D/H inversion; σ(η) from σ(D/H_obs) — DH_OBS and _eta_fit defined above
 _dDH_deta = (compute_abundances(rf_2par, eta=_eta_fit+1e-12)['D_H'] - compute_abundances(rf_2par, eta=_eta_fit-1e-12)['D_H']) / 2e-12
 sig_eta = SIG_DH_OBS / abs(_dDH_deta) if abs(_dDH_deta) > 1e-20 else float('nan')
+# Joint Hessian uncertainty for eta (from joint_uncertainties.py):
+# rho(ah, eta10) = +0.676 inflates sigma_eta vs the D/H-only propagation above.
+sig_eta_joint = 7.78e-12   # replaces sig_eta in the 3-par table row
 
 # η_ΛCDM: invert D/H to match D/H^obs with H=H_std (ΛCDM second free param in BBN fit)
 _eta_lcdm = brentq(lambda e: compute_abundances(lambda T: 1.0, eta=e)['D_H'] - DH_OBS, 5e-10, 10e-10)
@@ -594,7 +597,7 @@ row_t1("BAO+SN+BBN", MODEL, 1,
 
 # Hyp. a-run, 2-par (al and ah fixed; k=3 vs ΛCDM k=2; chi2_BBN from Y_p residual)
 row_t1("BAO+SN+BBN", MODEL, 3,
-        f"al={_paren(al_2par, sig_al_2par)}, ah={_paren(ah_2par, sig_ah_2par)}, eta={_paren(_eta_fit*1e10, sig_eta*1e10)}e-10",
+        f"al={_paren(al_2par, sig_al_2par)}, ah={_paren(ah_2par, sig_ah_2par)}, eta={_paren(_eta_fit*1e10, sig_eta_joint*1e10)}e-10",
         zf_2par, Ef_2par, _paren(gm_2par, sig_gm_2par),
         yp=_paren(float(abund_2par['Y_p']), _SIG_YP),
         dh=_paren(float(abund_2par['D_H']*1e5), float(SIG_DH_OBS*1e5)),
