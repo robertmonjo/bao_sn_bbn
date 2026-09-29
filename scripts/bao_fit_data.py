@@ -43,7 +43,7 @@ N_SQRT     = 0.5      # fixed exponent: (1+z)^{-0.5} = 1/sqrt(1+z)
 OMEGA_M_LCDM_JNT = 0.339   # LCDM joint BAO+SN optimal (used for all panels)
 # n=3 extension parameters (Table 1, BBN block, α_low+α_high+η free)
 AL_3PAR = 0.255
-AH_3PAR = 0.4364
+AH_3PAR = 0.4379
 
 # ── load BAO data ────────────────────────────────────────────────────────────
 DATA_BAO = ROOT / "data" / "Ardra" / "desi_dr1_bao_galqso_lya_mean.csv"
@@ -236,18 +236,19 @@ ax_sn     = fig.add_subplot(gs_sn[0, 0:2])
 ax_sn_res = fig.add_subplot(gs_sn[1, 0:2], sharex=ax_sn)
 ax_legend = fig.add_subplot(gs_sn[:, 2])
 
-COL_HYP  = "#4477AA"
-COL_LCDM = "#EE6677"
-COL_BAO  = "#222222"
-COL_SN   = "#228833"
+COL_HYP       = "#4477AA"
+COL_HYP_LIGHT = "#88BBDD"   # lighter blue for n=1 residual points
+COL_LCDM      = "#EE6677"
+COL_BAO       = "#222222"
+COL_SN        = "#228833"
 
 def _resid_panel(ax_res, z_pts, res_h, res_l, sig, xlabel, res_h3=None):
     for lv, ls in [(0, "-"), (1, "--"), (-1, "--"), (2, ":"), (-2, ":")]:
         ax_res.axhline(lv, color="gray", lw=0.6, ls=ls)
-    ax_res.scatter(z_pts, res_l / sig, color=COL_LCDM, s=24, marker="s", zorder=2)
+    ax_res.scatter(z_pts, res_l / sig, color=COL_LCDM, s=22, marker="s", zorder=2)
     if res_h3 is not None:
-        ax_res.scatter(z_pts, res_h3 / sig, color=COL_HYP, s=16, marker="^", zorder=3, alpha=0.85)
-    ax_res.scatter(z_pts, res_h / sig, color=COL_HYP,  s=20, zorder=4)
+        ax_res.scatter(z_pts, res_h3 / sig, color=COL_HYP, s=14, marker="^", zorder=3, alpha=0.85)
+    ax_res.scatter(z_pts, res_h / sig, color=COL_HYP_LIGHT, s=12, zorder=4)
     ax_res.set_ylabel(r"$\Delta/\sigma$", fontsize=7)
     ax_res.set_ylim(-3.2, 3.2)
     ax_res.set_xlabel(xlabel)
@@ -262,9 +263,9 @@ panel_cfg = [
     (ax_dv, ax_dv_res, dv_hyp, dv_lcdm, dv_hyp_3, dv_sel, dv_lya, r"$D_V/r_s$"),
 ]
 for ax, ax_res, hyp_c, lc_c, hyp3_c, sel, lya_pts, ylabel in panel_cfg:
-    ax.plot(z_curve, hyp_c,  color=COL_HYP,  lw=1.8)
-    ax.plot(z_curve, lc_c,   color=COL_LCDM, lw=1.4, ls="--")
-    ax.plot(z_curve, hyp3_c, color=COL_HYP,  lw=0.9, ls=":")
+    ax.plot(z_curve, hyp_c,  color=COL_HYP,  lw=2.5)
+    ax.plot(z_curve, lc_c,   color=COL_LCDM, lw=1.5, ls="--")
+    ax.plot(z_curve, hyp3_c, color=COL_HYP,  lw=0.8, ls=":")
     ax.errorbar(z_bao[sel], d_bao[sel], yerr=sig_bao[sel], fmt="o", color=COL_BAO,
                 ms=5, elinewidth=1.2, capsize=3, zorder=5)
     if lya_pts:
@@ -280,9 +281,9 @@ for ax, ax_res, hyp_c, lc_c, hyp3_c, sel, lya_pts, ylabel in panel_cfg:
 
 
 # ── SN panel ──────────────────────────────────────────────────────────────────
-ax_sn.plot(z_sn_curve, dc_sn_hyp,  color=COL_HYP,  lw=1.8)
-ax_sn.plot(z_sn_curve, dc_sn_lcdm, color=COL_LCDM, lw=1.4, ls="--")
-ax_sn.plot(z_sn_curve, dc_sn_hyp_3, color=COL_HYP, lw=0.9, ls=":")
+ax_sn.plot(z_sn_curve, dc_sn_hyp,  color=COL_HYP,  lw=2.5)
+ax_sn.plot(z_sn_curve, dc_sn_lcdm, color=COL_LCDM, lw=1.5, ls="--")
+ax_sn.plot(z_sn_curve, dc_sn_hyp_3, color=COL_HYP, lw=0.8, ls=":")
 ax_sn.errorbar(z_sn, d_sn / A_hyp, yerr=sig_sn, fmt="o", color=COL_SN,
                ms=3.5, elinewidth=0.8, alpha=0.7, zorder=5)
 ax_sn.set_ylabel(r"$d_{\rm proxy}/A$")
@@ -294,11 +295,11 @@ ax_sn_res.set_ylim(-5, 5)
 # ── global legend ─────────────────────────────────────────────────────────────
 ax_legend.axis("off")
 legend_handles = [
-    Line2D([0], [0], color=COL_HYP,  lw=1.8,
+    Line2D([0], [0], color=COL_HYP,  lw=2.5,
            label=r"Hyp. $\alpha$-run ($n=1$, $\alpha_{\rm h}=0.422$)"),
-    Line2D([0], [0], color=COL_HYP,  lw=0.9, ls=":",
-           label=r"Hyp. $\alpha$-run ($n=3$, $\alpha_{\rm l}=0.255$, $\alpha_{\rm h}=0.436$)"),
-    Line2D([0], [0], color=COL_LCDM, lw=1.4, ls="--",
+    Line2D([0], [0], color=COL_HYP,  lw=0.8, ls=":",
+           label=r"Hyp. $\alpha$-run ($n=3$, $\alpha_{\rm l}=0.255$, $\alpha_{\rm h}=0.438$)"),
+    Line2D([0], [0], color=COL_LCDM, lw=1.5, ls="--",
            label=rf"$\Lambda$CDM ($\Omega_m={OMEGA_M_LCDM_JNT}$)"),
     Line2D([0], [0], color=COL_BAO, marker="o", ms=5, lw=1.2,
            label="DESI DR1 (10 pts, fit)"),
@@ -306,7 +307,7 @@ legend_handles = [
            mfc="white", mec=COL_LYA, label=r"DESI DR1 Ly$\alpha$ (excl.)"),
     Line2D([0], [0], color=COL_SN,  marker="o", ms=3.5, lw=0.8, alpha=0.7,
            label=r"Pantheon$+$ 50-bin"),
-    Line2D([0], [0], color=COL_HYP,  marker="o", ms=5, lw=0,
+    Line2D([0], [0], color=COL_HYP_LIGHT, marker="o", ms=4, lw=0,
            label=r"Hyp. $\Delta/\sigma$ ($n=1$)"),
     Line2D([0], [0], color=COL_HYP, marker="^", ms=4, lw=0, alpha=0.85,
            label=r"Hyp. $\Delta/\sigma$ ($n=3$)"),
