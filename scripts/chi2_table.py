@@ -3,8 +3,9 @@ Joint chi² table: BAO+SN and BAO+SN+BBN — Table 1 reproduction.
 
 Columns (12):
   Constraint | Model | n | Parameters | H_norm | Y_p | D/H(×10⁻⁵) |
-  χ²ν_BAO | χ²ν_SN | Δχ²_BAO | Δχ²_SN | ΔAIC_tot
+  χ²_N,BAO | χ²_N,SN | χ²_N,BBN | Δχ²_BAO | Δχ²_SN | Δχ²_BBN | ΔAIC_tot
 
+χ²_N,sub = χ²_sub / N_sub  (per data point, not per dof).
 ΔAIC_tot = Δ(χ²_BAO + χ²_SN + χ²_BBN) + 2·(k_model − k_ΛCDM)
 """
 from __future__ import annotations
@@ -80,6 +81,7 @@ z_sn = np.asarray(raw["z"], float)
 d_sn = np.asarray(raw["d_proxy"], float)
 s_sn = np.asarray(raw["sigma_d"], float)
 N_SN = len(z_sn); DOF_SN = N_SN - 1
+N_BBN = 2  # primordial Y_p + D/H
 
 Z_MAX = max(z_bao.max(), z_sn.max())
 
@@ -514,13 +516,13 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
     """
     c2b = chi2_bao(zf, Ef); c2s = chi2_sn(zf, Ef)
     c2j = c2b + c2s + c2_bbn
-    nb = c2b / (N_BAO - k_model); ns = c2s / (N_SN - k_model)
+    nb = c2b / N_BAO; ns = c2s / N_SN   # χ²_N = χ²/N (per data point)
     db = c2b - c2b_jnt; ds = c2s - c2s_jnt
     dj = (c2j - c2j_lcdm - c2_bbn_ref) + 2*(k_model - k_lcdm)
     yp_s = str(yp)
     dh_s = str(dh)
     if dof_bbn is not None:
-        _c2b_nu = c2_bbn / dof_bbn
+        _c2b_nu = c2_bbn / N_BBN   # χ²_N,BBN = χ²_BBN / N_BBN
         nb_bbn  = f"{_c2b_nu:.0f}" if _c2b_nu >= 10 else f"{_c2b_nu:.2f}"
         _dc2b   = c2_bbn - c2_bbn_ref
         dc2_bbn = f"{_dc2b:+.0f}" if abs(_dc2b) >= 10 else f"{_dc2b:+.2f}"
@@ -528,13 +530,13 @@ def row_t1(constraint, model, n_free, param, zf, Ef, bbn_norm,
         nb_bbn = "---"; dc2_bbn = "---"
     print(f"{constraint:<14} {model:<18} {n_free:>2}  {param:<24} "
           f"{bbn_norm:>7}  {yp_s:>5}  {dh_s:>5}  "
-          f"{nb:>6.2f}  {ns:>6.2f}  {nb_bbn:>7}  "
+          f"{nb:>8.3f}  {ns:>8.3f}  {nb_bbn:>8}  "
           f"{db:>+6.1f}  {ds:>+6.1f}  {dc2_bbn:>7}  {dj:>+7.1f}")
 
 hdr = (f"{'Constraint':<14} {'Model':<18}  n  {'Parameters':<24} "
        f"{'H_norm':>7}  {'Y_p':>5}  {'D/H':>5}  "
-       f"{'χ²ν_BAO':>7}  {'χ²ν_SN':>7}  {'χ²ν_BBN':>7}  "
-       f"{'Δχ²_BAO':>7}  {'Δχ²_SN':>7}  {'Δχ²_BBN':>7}  {'ΔAIC':>7}")
+       f"{'c2N_BAO':>8}  {'c2N_SN':>8}  {'c2N_BBN':>8}  "
+       f"{'Dc2_BAO':>7}  {'Dc2_SN':>7}  {'Dc2_BBN':>7}  {'DAIC':>7}")
 sep = "-" * len(hdr)
 print(hdr)
 print(f"  (D/H in units of 1e-5; H_norm = geometric mean H_model/H_std at T=0.07–0.10 MeV)")
