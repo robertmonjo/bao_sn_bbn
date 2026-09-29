@@ -198,7 +198,6 @@ def sat(n, ah=ALPHA_HIGH, al=ALPHA_LOW):
     """Saturating running alpha: alpha(z) = ah - (ah-al)*(1+z)^{-n}."""
     return lambda z: ah - (ah-al)*(1+z)**(-n)
 
-def pade(al,zc): return lambda z: al + (ALPHA_HIGH-al)*z/(z+zc)
 
 def _e_sat_on_grid(n, z_eval, ah=ALPHA_HIGH, al=ALPHA_LOW):
     """E(z)/E(0) for SAT running-alpha on a provided z_eval grid (must start at 0).
