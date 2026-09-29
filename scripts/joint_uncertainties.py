@@ -44,6 +44,8 @@ def chi2_scaled(x):
 x0_scaled = [ct.al_2par, ct.ah_2par, ct._eta_fit * 1e10]
 res = minimize(chi2_scaled, x0_scaled, method='Nelder-Mead',
                options={'xatol': 1e-7, 'fatol': 1e-7, 'maxiter': 20000})
+if not res.success:
+    print(f"WARNING: joint Nelder-Mead did not converge ({res.nit} iter): {res.message}", file=sys.stderr)
 al_opt, ah_opt, eta10_opt = res.x
 chi2_min = res.fun
 

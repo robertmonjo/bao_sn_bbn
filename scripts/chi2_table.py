@@ -11,6 +11,9 @@ Columns (12):
 from __future__ import annotations
 import csv, sys
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 import numpy as np
 from scipy.optimize import minimize, minimize_scalar, brentq
 from scipy.interpolate import interp1d as _interp1d
@@ -374,6 +377,8 @@ def _chi2_3par(params):
 _res_3par = minimize(_chi2_3par, [0.255, 0.4364, 7.658e-10],
                      method='Nelder-Mead',
                      options={'xatol': 1e-6, 'fatol': 1e-5, 'maxiter': 8000})
+if not _res_3par.success:
+    print(f"WARNING: 3-par fit did not converge ({_res_3par.nit} iter): {_res_3par.message}", file=sys.stderr)
 al_2par, ah_2par, _eta_fit = _res_3par.x
 zf_2par, Ef_2par = E_hippopede_al(sat(N_SAT_FIX, ah_2par, al_2par), al=al_2par)
 gm_2par = bbn_geomean(N_SAT_FIX, ah_2par, al=al_2par)

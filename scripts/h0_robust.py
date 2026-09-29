@@ -43,6 +43,8 @@ def daic_at_h0(H0_kms, x0=None):
     res = minimize(lambda p: chi2_3par_h0(p, H0_kms), x0,
                    method='Nelder-Mead',
                    options={'xatol': 1e-6, 'fatol': 1e-5, 'maxiter': 8000})
+    if not res.success:
+        print(f"WARNING: H0={H0_kms} fit did not converge ({res.nit} iter): {res.message}", file=sys.stderr)
     al, ah, eta = res.x
     zf, Ef = ct.E_hippopede_al(ct.sat(ct.N_SAT_FIX, ah, al), al=al)
     c2bao = ct.chi2_bao(zf, Ef)
