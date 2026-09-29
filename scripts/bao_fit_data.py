@@ -206,6 +206,10 @@ res_sn_hyp  = d_sn / A_hyp - mv_sn_hyp
 res_sn_lcdm = d_sn / A_hyp - (A_lcdm / A_hyp) * mv_sn_lcdm
 sig_sn      = s_sn / A_hyp
 
+# n=3 residuals
+res_bao_hyp_3 = d_bao - beta_hyp_3 * mv_hyp_bao_3
+res_sn_hyp_3  = d_sn / A_hyp - (A_hyp_3 / A_hyp) * mv_sn_hyp_3
+
 # chi2 with full covariance (for annotations)
 chi2_bao_hyp  = float(res_bao_hyp  @ C_inv @ res_bao_hyp)
 chi2_bao_lcdm = float(res_bao_lcdm @ C_inv @ res_bao_lcdm)
@@ -237,11 +241,13 @@ COL_LCDM = "#EE6677"
 COL_BAO  = "#222222"
 COL_SN   = "#228833"
 
-def _resid_panel(ax_res, z_pts, res_h, res_l, sig, xlabel):
+def _resid_panel(ax_res, z_pts, res_h, res_l, sig, xlabel, res_h3=None):
     for lv, ls in [(0, "-"), (1, "--"), (-1, "--"), (2, ":"), (-2, ":")]:
         ax_res.axhline(lv, color="gray", lw=0.6, ls=ls)
-    ax_res.scatter(z_pts, res_h / sig, color=COL_HYP,  s=22, zorder=3)
-    ax_res.scatter(z_pts, res_l / sig, color=COL_LCDM, s=22, marker="s", zorder=3)
+    ax_res.scatter(z_pts, res_l / sig, color=COL_LCDM, s=24, marker="s", zorder=2)
+    if res_h3 is not None:
+        ax_res.scatter(z_pts, res_h3 / sig, color=COL_HYP, s=16, marker="^", zorder=3, alpha=0.85)
+    ax_res.scatter(z_pts, res_h / sig, color=COL_HYP,  s=20, zorder=4)
     ax_res.set_ylabel(r"$\Delta/\sigma$", fontsize=7)
     ax_res.set_ylim(-3.2, 3.2)
     ax_res.set_xlabel(xlabel)
@@ -257,32 +263,32 @@ panel_cfg = [
 ]
 for ax, ax_res, hyp_c, lc_c, hyp3_c, sel, lya_pts, ylabel in panel_cfg:
     ax.plot(z_curve, hyp_c,  color=COL_HYP,  lw=1.8)
-    ax.plot(z_curve, hyp3_c, color=COL_HYP,  lw=0.9, ls=":")
     ax.plot(z_curve, lc_c,   color=COL_LCDM, lw=1.4, ls="--")
+    ax.plot(z_curve, hyp3_c, color=COL_HYP,  lw=0.9, ls=":")
     ax.errorbar(z_bao[sel], d_bao[sel], yerr=sig_bao[sel], fmt="o", color=COL_BAO,
-                ms=5, elinewidth=1.2, capsize=3)
+                ms=5, elinewidth=1.2, capsize=3, zorder=5)
     if lya_pts:
         zp, dp, ep = zip(*lya_pts)
         ax.errorbar(zp, dp, yerr=ep, fmt="o", color=COL_LYA, ms=5,
-                    elinewidth=1.2, capsize=3, mfc="white", mec=COL_LYA, zorder=2)
+                    elinewidth=1.2, capsize=3, mfc="white", mec=COL_LYA, zorder=4)
     ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.25, lw=0.5)
     plt.setp(ax.get_xticklabels(), visible=False)
     _resid_panel(ax_res, z_bao[sel],
                  res_bao_hyp[sel], res_bao_lcdm[sel], sig_bao[sel],
-                 r"$z_\mathrm{eff}$")
+                 r"$z_\mathrm{eff}$", res_h3=res_bao_hyp_3[sel])
 
 
 # ── SN panel ──────────────────────────────────────────────────────────────────
 ax_sn.plot(z_sn_curve, dc_sn_hyp,  color=COL_HYP,  lw=1.8)
-ax_sn.plot(z_sn_curve, dc_sn_hyp_3, color=COL_HYP, lw=0.9, ls=":")
 ax_sn.plot(z_sn_curve, dc_sn_lcdm, color=COL_LCDM, lw=1.4, ls="--")
+ax_sn.plot(z_sn_curve, dc_sn_hyp_3, color=COL_HYP, lw=0.9, ls=":")
 ax_sn.errorbar(z_sn, d_sn / A_hyp, yerr=sig_sn, fmt="o", color=COL_SN,
-               ms=3.5, elinewidth=0.8, alpha=0.7)
+               ms=3.5, elinewidth=0.8, alpha=0.7, zorder=5)
 ax_sn.set_ylabel(r"$d_{\rm proxy}/A$")
 ax_sn.grid(True, alpha=0.25, lw=0.5)
 plt.setp(ax_sn.get_xticklabels(), visible=False)
-_resid_panel(ax_sn_res, z_sn, res_sn_hyp, res_sn_lcdm, sig_sn, r"$z$")
+_resid_panel(ax_sn_res, z_sn, res_sn_hyp, res_sn_lcdm, sig_sn, r"$z$", res_h3=res_sn_hyp_3)
 ax_sn_res.set_ylim(-5, 5)
 
 # ── global legend ─────────────────────────────────────────────────────────────
@@ -301,7 +307,9 @@ legend_handles = [
     Line2D([0], [0], color=COL_SN,  marker="o", ms=3.5, lw=0.8, alpha=0.7,
            label=r"Pantheon$+$ 50-bin"),
     Line2D([0], [0], color=COL_HYP,  marker="o", ms=5, lw=0,
-           label=r"Hyp. $\Delta/\sigma$"),
+           label=r"Hyp. $\Delta/\sigma$ ($n=1$)"),
+    Line2D([0], [0], color=COL_HYP, marker="^", ms=4, lw=0, alpha=0.85,
+           label=r"Hyp. $\Delta/\sigma$ ($n=3$)"),
     Line2D([0], [0], color=COL_LCDM, marker="s", ms=5, lw=0,
            label=r"$\Lambda$CDM $\Delta/\sigma$"),
 ]
