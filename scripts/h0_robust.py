@@ -21,8 +21,9 @@ from h0_sensitivity import bbn_rf_h0
 # ── Re-optimisation at a given H0 ────────────────────────────────────────────
 
 def chi2_3par_h0(params, H0_kms):
-    al, ah, eta = params
-    if al < 0.05 or ah <= al + 0.01 or ah > 0.90 or eta < 3e-10 or eta > 15e-10:
+    al, ah, eta10 = params          # eta10 = eta * 1e10 (O(1) scale for Nelder-Mead)
+    eta = eta10 * 1e-10
+    if al < 0.05 or ah <= al + 0.01 or ah > 0.90 or eta10 < 3.0 or eta10 > 15.0:
         return 1e10
     try:
         zf_, Ef_ = ct.E_hippopede_al(ct.sat(ct.N_SAT_FIX, ah, al), al=al)
@@ -32,20 +33,22 @@ def chi2_3par_h0(params, H0_kms):
         c2_yp = ((ab_['Y_p'] - ct._YP_OBS) / ct._SIG_YP) ** 2
         c2_dh = ((ab_['D_H'] - ct.DH_OBS) / ct.SIG_DH_OBS) ** 2
         return c2bs + c2_yp + c2_dh
-    except Exception:
+    except Exception as exc:
+        print(f"WARNING: chi2_3par_h0 failed ({exc})", file=sys.stderr)
         return 1e10
 
 
 def daic_at_h0(H0_kms, x0=None):
     """Full 3-par Nelder-Mead at the given H0; returns (DAIC, al, ah, eta, Yp)."""
     if x0 is None:
-        x0 = [ct.al_2par, ct.ah_2par, ct._eta_fit]
+        x0 = [ct.al_2par, ct.ah_2par, ct._eta_fit * 1e10]   # eta10 units
     res = minimize(lambda p: chi2_3par_h0(p, H0_kms), x0,
                    method='Nelder-Mead',
                    options={'xatol': 1e-6, 'fatol': 1e-5, 'maxiter': 8000})
     if not res.success:
         print(f"WARNING: H0={H0_kms} fit did not converge ({res.nit} iter): {res.message}", file=sys.stderr)
-    al, ah, eta = res.x
+    al, ah, eta10 = res.x
+    eta = eta10 * 1e-10
     zf, Ef = ct.E_hippopede_al(ct.sat(ct.N_SAT_FIX, ah, al), al=al)
     c2bao = ct.chi2_bao(zf, Ef)
     c2sn  = ct.chi2_sn(zf, Ef)
@@ -63,20 +66,21 @@ def daic_at_h0(H0_kms, x0=None):
     return daic, al, ah, eta, yp, dh
 
 
-print("Robustness of DAIC under re-optimisation at each H0")
-print("=" * 68)
-print(f"{'H0':>5}  {'DAIC':>6}  {'al':>6}  {'ah':>7}  {'eta*1e10':>9}  {'Yp':>7}  {'D/H*1e5':>8}")
-print("-" * 68)
+if __name__ == '__main__':
+    print("Robustness of DAIC under re-optimisation at each H0")
+    print("=" * 68)
+    print(f"{'H0':>5}  {'DAIC':>6}  {'al':>6}  {'ah':>7}  {'eta*1e10':>9}  {'Yp':>7}  {'D/H*1e5':>8}")
+    print("-" * 68)
 
-H0_grid = [65, 67, 68, 69, 70, 71, 72, 74]
-x_prev = None
-for H0 in H0_grid:
-    daic, al, ah, eta, yp, dh = daic_at_h0(H0, x0=x_prev)
-    x_prev = [al, ah, eta]
-    marker = " <-- adopted" if H0 == 68 else ""
-    print(f"{H0:>5}  {daic:>+6.2f}  {al:>6.4f}  {ah:>7.5f}  {eta*1e10:>9.4f}  {yp:>7.4f}  {dh*1e5:>8.4f}{marker}")
+    H0_grid = [65, 67, 68, 69, 70, 71, 72, 74]
+    x_prev = None
+    for H0 in H0_grid:
+        daic, al, ah, eta, yp, dh = daic_at_h0(H0, x0=x_prev)
+        x_prev = [al, ah, eta * 1e10]   # keep eta10 units for next iteration
+        marker = " <-- adopted" if H0 == 68 else ""
+        print(f"{H0:>5}  {daic:>+6.2f}  {al:>6.4f}  {ah:>7.5f}  {eta*1e10:>9.4f}  {yp:>7.4f}  {dh*1e5:>8.4f}{marker}")
 
-print()
-print("NOTE: DAIC at each H0 is the result of a full re-optimisation over")
-print("(al, ah, eta), so it is comparable to the adopted fit, not to the")
-print("sensitivity analysis in h0_sensitivity.py (which fixed the parameters).")
+    print()
+    print("NOTE: DAIC at each H0 is the result of a full re-optimisation over")
+    print("(al, ah, eta), so it is comparable to the adopted fit, not to the")
+    print("sensitivity analysis in h0_sensitivity.py (which fixed the parameters).")

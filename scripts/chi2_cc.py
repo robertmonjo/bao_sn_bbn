@@ -13,6 +13,7 @@ Method: marginalise H0 analytically at fixed (al, ah) from chi2_table joint fit.
 
 Then feeds H0_opt into h0_sensitivity logic to get the implied DAIC.
 """
+import os
 import sys
 from pathlib import Path
 import csv
@@ -27,8 +28,14 @@ from bbn_hyperconical import compute_abundances
 from h0_sensitivity import bbn_rf_h0, gm_h0
 
 # ── CC data ───────────────────────────────────────────────────────────────────
-CC_FILE = (Path(r"C:\Users\rober\OneDrive\Documents\Codex_Portatil\00_projectes")
-           / "hippopede" / "data" / "hz_background" / "hz_curated_chronometers.csv")
+# Data lives in the sibling hippopede project; override with env var CC_DATA_FILE if needed.
+_CC_DEFAULT = ROOT.parent / "hippopede" / "data" / "hz_background" / "hz_curated_chronometers.csv"
+CC_FILE = Path(os.environ.get("CC_DATA_FILE", _CC_DEFAULT))
+if not CC_FILE.exists():
+    raise FileNotFoundError(
+        f"CC data not found at {CC_FILE}.\n"
+        "Set the CC_DATA_FILE environment variable to the path of hz_curated_chronometers.csv."
+    )
 
 def _load_cc(path=CC_FILE):
     z_cc, h_cc, s_cc = [], [], []

@@ -14,6 +14,7 @@ Python 3.9 or later with:
 ```
 numpy >= 1.24
 scipy >= 1.11
+matplotlib >= 3.7
 ```
 
 Install with:
@@ -35,17 +36,26 @@ and prints Table 1 of the paper to stdout.
 ## Repository structure
 
 ```
-bbn_hyperconical.py          BBN abundance calculator (Kolb & Turner 1990)
+bbn_hyperconical.py               BBN abundance calculator (Kolb & Turner 1990)
 scripts/
-  hyperconical_model.py      Hyperconical E(z) model
-  chi2_table.py              Reproduces Table 1 (BAO + SN + BBN fits)
-  bao_fit_data.py            BAO data preparation
+  hyperconical_model.py           Hyperconical E(z) model
+  chi2_table.py                   Reproduces Table 1 (BAO + SN + BBN fits)  [canonical]
+  joint_uncertainties.py          Joint 1σ uncertainties via Hessian         [canonical]
+  bao_fit_compute.py              BAO-only and joint ΛCDM fits; writes JSON  [canonical]
+  h0_robust.py                    Robustness of ΔAIC across H0 values        [canonical]
+  bao_fit_data.py                 BAO data preparation and figures
+  h0_sensitivity.py               H0 sensitivity at fixed (al, ah)
+  chi2_cc.py                      Cosmic chronometer H0 constraint           [exploratory]
 data/
-  Ardra/                     DESI DR1 BAO compressed statistics
-  gapp/                      Pantheon+ binned distance moduli
-main.tex                     Manuscript
-main-ref.bib                 Bibliography
+  Ardra/                          DESI DR1 BAO compressed statistics
+  gapp/                           Pantheon+ binned distance moduli
+main.tex                          Manuscript
+main-ref.bib                      Bibliography
 ```
+
+Scripts marked **[canonical]** reproduce numbers in the paper. Scripts marked
+**[exploratory]** depend on data not included in this repository (see inline
+comments) and are provided for transparency.
 
 ## Data sources
 

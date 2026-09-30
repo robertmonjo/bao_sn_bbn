@@ -96,3 +96,10 @@ class ExtendedProjectedHyperconical(MonjoProjectedHyperconical):
         x = self.x_from_lz(lz)
         dr_dz = self.dinvll_dx(x) * self.dxdLZ(x) / (1.0 + z)
         return 1.0 / dr_dz
+
+    def e_and_q(self, z):
+        """Return (E(z), q(z)) where E = H(z)/H(0). q is a zero placeholder."""
+        z = np.asarray(z, dtype=float)
+        H = self.projected_hubble_unnormalized(z)
+        H0 = float(self.projected_hubble_unnormalized(np.array([0.0]))[0])
+        return H / H0, np.zeros_like(H)
